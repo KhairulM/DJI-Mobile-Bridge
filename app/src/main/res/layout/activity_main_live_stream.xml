@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".MainActivityLiveStream">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <com.cadit.djicamera.utilities.VideoFeedView
+                android:id="@+id/video_view_primary_video_feed"
+                style="@style/main_camera_view"/>
+
+            <EditText
+                android:id="@+id/edit_live_show_url_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textUri"
+                android:hint="Masukan alamat"
+                android:layout_marginTop="10dp"/>
+
+            <Button
+                android:id="@+id/btn_start_live_show"
+                style="@style/common_button"
+                android:text="Start Live Show"/>
+
+            <Button
+                android:id="@+id/btn_stop_live_show"
+                style="@style/common_button"
+                android:text="Stop Live Show"/>
+
+            <Button
+                android:id="@+id/btn_sound_on"
+                style="@style/common_button"
+                android:text="Sound On"
+                android:layout_marginTop="10dp"/>
+
+            <Button
+                android:id="@+id/btn_sound_off"
+                style="@style/common_button"
+                android:text="Sound Off" />
+
+            <Button
+                android:id="@+id/btn_is_live_show_on"
+                style="@style/common_button"
+                android:text="Is Live Show On" />
+
+            <Button
+                android:id="@+id/btn_show_info"
+                style="@style/common_button"
+                android:text="Show Info" />
+
+            <Button
+                android:id="@+id/btn_show_live_start_time"
+                style="@style/common_button"
+                android:text="Live Start Time" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
