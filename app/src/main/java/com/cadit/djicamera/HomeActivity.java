@@ -6,6 +6,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -32,6 +33,7 @@ import com.hivemq.client.mqtt.mqtt3.exceptions.Mqtt3ConnAckException;
 import com.hivemq.client.mqtt.mqtt3.message.connect.connack.Mqtt3ConnAck;
 import com.hivemq.client.mqtt.mqtt3.message.connect.connack.Mqtt3ConnAckReturnCode;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -58,7 +60,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private static final String URL_KEY = "sp_stream_url";
     private static final int MQTT_PORT = 1883;
 
-    private Mqtt3BlockingClient mMqttClient = null;
+    private Mqtt3AsyncClient mMqttClient = null;
 
     private BaseProduct mProduct = null;
     private LiveStreamManager.OnLiveChangeListener mListener;
@@ -294,36 +296,32 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         };
     }
 
+    @SuppressLint("NewApi")
     private void initMQTTClient() {
         mMqttClient = MqttClient.builder()
                 .useMqttVersion3()
                 .serverHost(mMqttBrokerURL)
                 .serverPort(MQTT_PORT)
-                .buildBlocking();
+                .buildAsync();
 
-        new Thread() {
-            @Override
-            public void run() {
-                showToast("Connecting to MQTT server");
-                Log.v(TAG, "Connecting to MQTT server");
+        showToast("Connecting to MQTT server");
+        Log.v(TAG, "Connecting to MQTT server");
 
-                try {
-                    Mqtt3ConnAck connAck= mMqttClient.connectWith()
-                            .simpleAuth()
-                            .username("khairulm")
-                            .password("makirin240999".getBytes())
-                            .applySimpleAuth()
-                            .send();
-
-                    showToast("MQTT server connected");
-                    Log.v(TAG, "MQTT server connected");
-                } catch (Exception e) {
-                    showToast("Failed to connect to MQTT server: " + e.toString());
-                    Log.e(TAG, e.toString());
-                }
-
-            }
-        }.start();
+        mMqttClient.connectWith()
+                .simpleAuth()
+                    .username("khairulm")
+                    .password("makirin240999".getBytes())
+                    .applySimpleAuth()
+                .send()
+                .whenComplete((mqtt3ConnAck, throwable) -> {
+                    if (throwable != null) {
+                        showToast("Failed to connect to MQTT server: " + throwable.toString());
+                        Log.e(TAG, throwable.toString());
+                    } else {
+                        showToast("MQTT server connected");
+                        Log.v(TAG, "MQTT server connected");
+                    }
+                });
     }
 
     private void showToast(final String toastMsg) {

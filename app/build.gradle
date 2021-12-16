@@ -2,6 +2,9 @@ plugins {
     id 'com.android.application'
 }
 apply plugin: 'kotlin-android'
+// HiveMQ
+apply plugin: 'com.android.application'
+apply plugin: 'com.github.sgtsilvio.gradle.android-retrofix'
 
 android {
     compileSdk 30
@@ -116,4 +119,6 @@ dependencies {
 
     // HIVEMQ
     implementation 'com.hivemq:hivemq-mqtt-client:1.2.2'
+    implementation 'net.sourceforge.streamsupport:android-retrostreams:1.7.4'
+    implementation 'net.sourceforge.streamsupport:android-retrofuture:1.7.4'
 }
