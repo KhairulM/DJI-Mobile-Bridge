@@ -411,7 +411,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             mEditRTMPServerURL.setEnabled(true);
 
             stopLivestream();
-            stopObstacleDetection();
             disconnectMQTTClient();
 
             mBtnToggleStartStop.setText(R.string.button_start);
@@ -508,51 +507,56 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             FlightAssistant intelligentFlightAssistant = flightController.getFlightAssistant();
 
             if (intelligentFlightAssistant != null) {
-                intelligentFlightAssistant.setVisionDetectionStateUpdatedCallback(new VisionDetectionState.Callback() {
+                new Thread() {
                     @Override
-                    public void onUpdate(@NonNull VisionDetectionState visionDetectionState) {
-                        ObstacleDetectionSector[] visionDetectionSectorArray =
-                                visionDetectionState.getDetectionSectors();
+                    public void run() {
+                        intelligentFlightAssistant.setVisionDetectionStateUpdatedCallback(new VisionDetectionState.Callback() {
+                            @Override
+                            public void onUpdate(@NonNull VisionDetectionState visionDetectionState) {
+                                ObstacleDetectionSector[] visionDetectionSectorArray =
+                                        visionDetectionState.getDetectionSectors();
 
-                        List<Float> obstacleDistances = new ArrayList<Float>();
-                        List<String> obstacleWarnings = new ArrayList<String>();
+                                List<Float> obstacleDistances = new ArrayList<Float>();
+                                List<String> obstacleWarnings = new ArrayList<String>();
 
-                        // FOR WARNING, REFER TO https://developer.dji.com/api-reference/android-api/Components/VisionDetectionState/DJIVisionDetectionState_DJIVisionDetectionSector.html#djivisiondetectionstate_visionsectorwarning_inline
-                        for (ObstacleDetectionSector visionDetectionSector : visionDetectionSectorArray) {
-                               obstacleDistances.add(visionDetectionSector.getObstacleDistanceInMeters());
+                                // FOR WARNING LEVEL, REFER TO https://developer.dji.com/api-reference/android-api/Components/VisionDetectionState/DJIVisionDetectionState_DJIVisionDetectionSector.html#djivisiondetectionstate_visionsectorwarning_inline
+                                for (ObstacleDetectionSector visionDetectionSector : visionDetectionSectorArray) {
+                                    obstacleDistances.add(visionDetectionSector.getObstacleDistanceInMeters());
 
-                               switch (visionDetectionSector.getWarningLevel()){
-                                   case INVALID:
-                                       obstacleWarnings.add("INVALID");
-                                       break;
-                                   case LEVEL_1:
-                                       obstacleWarnings.add("LEVEL_1");
-                                       break;
-                                   case LEVEL_2:
-                                       obstacleWarnings.add("LEVEL_2");
-                                       break;
-                                   case LEVEL_3:
-                                       obstacleWarnings.add("LEVEL_3");
-                                       break;
-                                   case LEVEL_4:
-                                       obstacleWarnings.add("LEVEL_4");
-                                       break;
-                                   case LEVEL_5:
-                                       obstacleWarnings.add("LEVEL_5");
-                                       break;
-                                   case LEVEL_6:
-                                       obstacleWarnings.add("LEVEL_6");
-                                       break;
-                                   case UNKNOWN:
-                                       obstacleWarnings.add("UNKNOWN");
-                                       break;
-                               }
-                        }
+                                    switch (visionDetectionSector.getWarningLevel()){
+                                        case INVALID:
+                                            obstacleWarnings.add("INVALID");
+                                            break;
+                                        case LEVEL_1:
+                                            obstacleWarnings.add("LEVEL_1");
+                                            break;
+                                        case LEVEL_2:
+                                            obstacleWarnings.add("LEVEL_2");
+                                            break;
+                                        case LEVEL_3:
+                                            obstacleWarnings.add("LEVEL_3");
+                                            break;
+                                        case LEVEL_4:
+                                            obstacleWarnings.add("LEVEL_4");
+                                            break;
+                                        case LEVEL_5:
+                                            obstacleWarnings.add("LEVEL_5");
+                                            break;
+                                        case LEVEL_6:
+                                            obstacleWarnings.add("LEVEL_6");
+                                            break;
+                                        case UNKNOWN:
+                                            obstacleWarnings.add("UNKNOWN");
+                                            break;
+                                    }
+                                }
 
-                        mqttPublish(TOPIC_OBSTACLE_DISTANCE, obstacleDistances.toString());
-                        mqttPublish(TOPIC_OBSTACLE_WARNING, obstacleWarnings.toString());
+                                mqttPublish(TOPIC_OBSTACLE_DISTANCE, obstacleDistances.toString());
+                                mqttPublish(TOPIC_OBSTACLE_WARNING, obstacleWarnings.toString());
+                            }
+                        });
                     }
-                });
+                }.start();
             }
         }
     }
@@ -571,9 +575,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         Log.v(TAG, pubMsg.toString());
                     }
                 });
-    }
-
-    private void stopObstacleDetection() {
     }
 
     private void showLiveStreamStatus() {
