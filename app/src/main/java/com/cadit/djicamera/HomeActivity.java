@@ -62,6 +62,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     private static final String TAG = HomeActivity.class.getName();
     private static final String URL_KEY = "sp_stream_url";
+    private static final String TOPIC_OBSTACLE_DISTANCE = "dji/obstacle/distance";
+    private static final String TOPIC_OBSTACLE_WARNING = "dji/obstacle/warning";
     private static final int MQTT_PORT = 1883;
 
     private Mqtt3AsyncClient mMqttClient = null;
@@ -547,19 +549,28 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                                }
                         }
 
-
+                        mqttPublish(TOPIC_OBSTACLE_DISTANCE, obstacleDistances.toString());
+                        mqttPublish(TOPIC_OBSTACLE_WARNING, obstacleWarnings.toString());
                     }
                 });
             }
         }
     }
 
-    private CompletableFuture<Mqtt3Publish> mqttPublish(String topic, String payload) {
-        return mMqttClient.publishWith()
+    @SuppressLint("NewApi")
+    private void mqttPublish(String topic, String payload) {
+        mMqttClient.publishWith()
                 .topic(topic)
                 .payload(payload.getBytes())
                 .qos(MqttQos.AT_LEAST_ONCE)
-                .send();
+                .send()
+                .whenComplete((pubMsg, throwable) -> {
+                    if (throwable != null) {
+                        Log.e(TAG, throwable.toString());
+                    } else {
+                        Log.v(TAG, pubMsg.toString());
+                    }
+                });
     }
 
     private void stopObstacleDetection() {
