@@ -27,20 +27,24 @@ import android.widget.Toast;
 import com.cadit.djicamera.controller.DJISampleApplication;
 import com.cadit.djicamera.utilities.ModuleVerificationUtil;
 import com.hivemq.client.mqtt.MqttClient;
+import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3BlockingClient;
 import com.hivemq.client.mqtt.mqtt3.exceptions.Mqtt3ConnAckException;
 import com.hivemq.client.mqtt.mqtt3.message.connect.connack.Mqtt3ConnAck;
 import com.hivemq.client.mqtt.mqtt3.message.connect.connack.Mqtt3ConnAckReturnCode;
+import com.hivemq.client.mqtt.mqtt3.message.publish.Mqtt3Publish;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dji.common.error.DJIError;
 import dji.common.error.DJISDKError;
 import dji.common.flightcontroller.ObstacleDetectionSector;
+import dji.common.flightcontroller.ObstacleDetectionSectorWarning;
 import dji.common.flightcontroller.VisionDetectionState;
 import dji.log.DJILog;
 import dji.sdk.base.BaseComponent;
@@ -296,32 +300,12 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         };
     }
 
-    @SuppressLint("NewApi")
     private void initMQTTClient() {
         mMqttClient = MqttClient.builder()
                 .useMqttVersion3()
                 .serverHost(mMqttBrokerURL)
                 .serverPort(MQTT_PORT)
                 .buildAsync();
-
-        showToast("Connecting to MQTT server");
-        Log.v(TAG, "Connecting to MQTT server");
-
-        mMqttClient.connectWith()
-                .simpleAuth()
-                    .username("khairulm")
-                    .password("makirin240999".getBytes())
-                    .applySimpleAuth()
-                .send()
-                .whenComplete((mqtt3ConnAck, throwable) -> {
-                    if (throwable != null) {
-                        showToast("Failed to connect to MQTT server: " + throwable.toString());
-                        Log.e(TAG, throwable.toString());
-                    } else {
-                        showToast("MQTT server connected");
-                        Log.v(TAG, "MQTT server connected");
-                    }
-                });
     }
 
     private void showToast(final String toastMsg) {
@@ -413,6 +397,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             Log.v(TAG, "STARTING MOBILE BRIDGE");
             mEditRTMPServerURL.setEnabled(false);
 
+            connectMQTTClient();
             startLivestream(this);
             startObstacleDetection();
 
@@ -425,10 +410,58 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
             stopLivestream();
             stopObstacleDetection();
+            disconnectMQTTClient();
 
             mBtnToggleStartStop.setText(R.string.button_start);
             mBtnCheckLivestream.setVisibility(View.GONE);
             mBtnShowInfo.setVisibility(View.GONE);
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private void connectMQTTClient() {
+        if (mMqttClient != null) {
+            showToast("Connecting to MQTT server");
+            Log.v(TAG, "Connecting to MQTT server");
+
+            mMqttClient.connectWith()
+                    .simpleAuth()
+                    .username("khairulm")
+                    .password("makirin240999".getBytes())
+                    .applySimpleAuth()
+                    .send()
+                    .whenComplete((mqtt3ConnAck, throwable) -> {
+                        if (throwable != null) {
+                            showToast("Failed to connect to MQTT server: " + throwable.toString());
+                            Log.e(TAG, throwable.toString());
+                        } else {
+                            showToast("MQTT server connected");
+                            Log.v(TAG, "MQTT server connected");
+                        }
+                    });
+        } else {
+            Log.e(TAG, "MQTT client have not been initialized");
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private void disconnectMQTTClient() {
+        if (mMqttClient != null) {
+            showToast("Disconnecting from MQTT server");
+            Log.v(TAG, "Disconnecting from MQTT server");
+
+            mMqttClient.disconnect()
+                    .whenComplete((ack, throwable) -> {
+                        if (throwable != null) {
+                            showToast("Failed to disconnect from MQTT server: " + throwable.toString());
+                            Log.e(TAG, throwable.toString());
+                        } else {
+                            showToast("MQTT server disconnected");
+                            Log.v(TAG, "MQTT server disconnected");
+                        }
+                    });
+        } else {
+            Log.e(TAG, "MQTT client have not been initialized");
         }
     }
 
@@ -473,44 +506,60 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             FlightAssistant intelligentFlightAssistant = flightController.getFlightAssistant();
 
             if (intelligentFlightAssistant != null) {
-                new Thread() {
+                intelligentFlightAssistant.setVisionDetectionStateUpdatedCallback(new VisionDetectionState.Callback() {
                     @Override
-                    public void run() {
-                        intelligentFlightAssistant.setVisionDetectionStateUpdatedCallback(new VisionDetectionState.Callback() {
-                            @Override
-                            public void onUpdate(@NonNull VisionDetectionState visionDetectionState) {
-                                StringBuilder stringBuilder = new StringBuilder();
+                    public void onUpdate(@NonNull VisionDetectionState visionDetectionState) {
+                        ObstacleDetectionSector[] visionDetectionSectorArray =
+                                visionDetectionState.getDetectionSectors();
 
-                                ObstacleDetectionSector[] visionDetectionSectorArray =
-                                        visionDetectionState.getDetectionSectors();
+                        List<Float> obstacleDistances = new ArrayList<Float>();
+                        List<String> obstacleWarnings = new ArrayList<String>();
 
-                                for (ObstacleDetectionSector visionDetectionSector : visionDetectionSectorArray) {
+                        // FOR WARNING, REFER TO https://developer.dji.com/api-reference/android-api/Components/VisionDetectionState/DJIVisionDetectionState_DJIVisionDetectionSector.html#djivisiondetectionstate_visionsectorwarning_inline
+                        for (ObstacleDetectionSector visionDetectionSector : visionDetectionSectorArray) {
+                               obstacleDistances.add(visionDetectionSector.getObstacleDistanceInMeters());
 
-                                    visionDetectionSector.getObstacleDistanceInMeters();
-                                    visionDetectionSector.getWarningLevel();
+                               switch (visionDetectionSector.getWarningLevel()){
+                                   case INVALID:
+                                       obstacleWarnings.add("INVALID");
+                                       break;
+                                   case LEVEL_1:
+                                       obstacleWarnings.add("LEVEL_1");
+                                       break;
+                                   case LEVEL_2:
+                                       obstacleWarnings.add("LEVEL_2");
+                                       break;
+                                   case LEVEL_3:
+                                       obstacleWarnings.add("LEVEL_3");
+                                       break;
+                                   case LEVEL_4:
+                                       obstacleWarnings.add("LEVEL_4");
+                                       break;
+                                   case LEVEL_5:
+                                       obstacleWarnings.add("LEVEL_5");
+                                       break;
+                                   case LEVEL_6:
+                                       obstacleWarnings.add("LEVEL_6");
+                                       break;
+                                   case UNKNOWN:
+                                       obstacleWarnings.add("UNKNOWN");
+                                       break;
+                               }
+                        }
 
-                                    stringBuilder.append("Obstacle distance: ")
-                                            .append(visionDetectionSector.getObstacleDistanceInMeters())
-                                            .append("\n");
-                                    stringBuilder.append("Distance warning: ")
-                                            .append(visionDetectionSector.getWarningLevel())
-                                            .append("\n");
-                                }
 
-                                stringBuilder.append("WarningLevel: ")
-                                        .append(visionDetectionState.getSystemWarning().name())
-                                        .append("\n");
-                                stringBuilder.append("Sensor state: ")
-                                        .append(visionDetectionState.isSensorBeingUsed())
-                                        .append("\n");
-
-                                Log.v(TAG, stringBuilder.toString());
-                            }
-                        });
                     }
-                }.start();
+                });
             }
         }
+    }
+
+    private CompletableFuture<Mqtt3Publish> mqttPublish(String topic, String payload) {
+        return mMqttClient.publishWith()
+                .topic(topic)
+                .payload(payload.getBytes())
+                .qos(MqttQos.AT_LEAST_ONCE)
+                .send();
     }
 
     private void stopObstacleDetection() {
