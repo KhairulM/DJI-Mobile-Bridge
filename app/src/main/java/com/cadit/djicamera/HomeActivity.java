@@ -29,22 +29,14 @@ import com.cadit.djicamera.utilities.ModuleVerificationUtil;
 import com.hivemq.client.mqtt.MqttClient;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient;
-import com.hivemq.client.mqtt.mqtt3.Mqtt3BlockingClient;
-import com.hivemq.client.mqtt.mqtt3.exceptions.Mqtt3ConnAckException;
-import com.hivemq.client.mqtt.mqtt3.message.connect.connack.Mqtt3ConnAck;
-import com.hivemq.client.mqtt.mqtt3.message.connect.connack.Mqtt3ConnAckReturnCode;
-import com.hivemq.client.mqtt.mqtt3.message.publish.Mqtt3Publish;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dji.common.error.DJIError;
 import dji.common.error.DJISDKError;
 import dji.common.flightcontroller.ObstacleDetectionSector;
-import dji.common.flightcontroller.ObstacleDetectionSectorWarning;
 import dji.common.flightcontroller.VisionDetectionState;
 import dji.log.DJILog;
 import dji.sdk.base.BaseComponent;
@@ -71,14 +63,19 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private BaseProduct mProduct = null;
     private LiveStreamManager.OnLiveChangeListener mListener;
 
-    private String mRTMPServerURL = "";
-    private String mMqttBrokerURL = "192.168.100.5";
+    private String mRtmpServerURI = "";
+    private String mMqttBrokerURI = "192.168.100.5";
+    private String mMqttUsername = "";
+    private String mMqttPassword = "";
 
     private TextView mTextProduct;
     private TextView mTextConnectionStatus;
     private TextView mTextFirmwareVersion;
     private TextView mTextSDKVersion;
-    private EditText mEditRTMPServerURL;
+    private EditText mEditRTMPServerURI;
+    private EditText mEditMQTTBrokerURI;
+    private EditText mEditMQTTUsername;
+    private EditText mEditMQTTPassword;
     private Button mBtnToggleStartStop;
     private Button mBtnCheckLivestream;
     private Button mBtnShowInfo;
@@ -256,7 +253,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void initUI(Context context) {
-        mRTMPServerURL = context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).getString(URL_KEY, mRTMPServerURL);
+        mRtmpServerURI = context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).getString(URL_KEY, mRtmpServerURI);
         mTextProduct = (TextView) findViewById(R.id.text_product_name);
         mTextConnectionStatus = (TextView) findViewById(R.id.text_connection_status);
         mTextFirmwareVersion = (TextView) findViewById(R.id.text_firmware_version);
@@ -264,7 +261,10 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         mTextSDKVersion = (TextView) findViewById(R.id.text_sdk_version);
         mTextSDKVersion.setText("DJI SDK version: " + DJISDKManager.getInstance().getSDKVersion());
 
-        mEditRTMPServerURL = (EditText) findViewById(R.id.edit_text_rtmp_server);
+        mEditRTMPServerURI = (EditText) findViewById(R.id.edit_text_rtmp_server);
+        mEditMQTTBrokerURI = (EditText) findViewById(R.id.edit_text_mqtt_broker);
+        mEditMQTTPassword = (EditText) findViewById(R.id.edit_text_mqtt_password);
+        mEditMQTTUsername = (EditText) findViewById(R.id.edit_text_mqtt_username);
 
         mBtnToggleStartStop = (Button) findViewById(R.id.button_start);
         mBtnToggleStartStop.setOnClickListener(this);
@@ -278,16 +278,54 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void initListener() {
-        mEditRTMPServerURL.addTextChangedListener(new TextWatcher() {
+        mEditRTMPServerURI.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {}
 
             @Override
             public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                mRTMPServerURL = charSequence.toString();
+                mRtmpServerURI = charSequence.toString();
+                setStartButtonState();
+            }
 
-                if (charSequence.length() > 0 && isProductConnected()) mBtnToggleStartStop.setEnabled(true);
-                else mBtnToggleStartStop.setEnabled(false);
+            @Override
+            public void afterTextChanged(Editable editable) {}
+        });
+
+        mEditMQTTBrokerURI.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {}
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+                mMqttBrokerURI = charSequence.toString();
+                setStartButtonState();
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {}
+        });
+
+        mEditMQTTUsername.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {}
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+                mMqttUsername = charSequence.toString();
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {}
+        });
+
+        mEditMQTTPassword.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {}
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+                mMqttPassword = charSequence.toString();
             }
 
             @Override
@@ -302,10 +340,20 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         };
     }
 
+    private void setStartButtonState() {
+        if (isProductConnected() &&
+            mRtmpServerURI.length() > 0 &&
+            mMqttBrokerURI.length() > 0) {
+            mBtnToggleStartStop.setEnabled(true);
+        } else {
+            mBtnToggleStartStop.setEnabled(false);
+        }
+    }
+
     private void initMQTTClient() {
         mMqttClient = MqttClient.builder()
                 .useMqttVersion3()
-                .serverHost(mMqttBrokerURL)
+                .serverHost(mMqttBrokerURI)
                 .serverPort(MQTT_PORT)
                 .buildAsync();
     }
@@ -362,9 +410,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             }
 
             // if product connected after rtmp server is filled
-            if (mRTMPServerURL.length() > 0) {
-                mBtnToggleStartStop.setEnabled(true);
-            }
+            setStartButtonState();
         } else {
             Log.v(TAG, "refreshSDK: False");
             mTextConnectionStatus.setText(R.string.product_default_status);
@@ -397,7 +443,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private void toggleStartButton() {
         if (mBtnToggleStartStop.getText().toString() == getResources().getString(R.string.button_start)) {
             Log.v(TAG, "STARTING MOBILE BRIDGE");
-            mEditRTMPServerURL.setEnabled(false);
+            mEditRTMPServerURI.setEnabled(false);
 
             connectMQTTClient();
             startLivestream(this);
@@ -408,7 +454,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             mBtnShowInfo.setVisibility(View.VISIBLE);
         } else {
             Log.v(TAG, "STOPPING MOBILE BRIDGE");
-            mEditRTMPServerURL.setEnabled(true);
+            mEditRTMPServerURI.setEnabled(true);
 
             stopLivestream();
             disconnectMQTTClient();
@@ -427,8 +473,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
             mMqttClient.connectWith()
                     .simpleAuth()
-                    .username("khairulm")
-                    .password("makirin240999".getBytes())
+                    .username(mMqttUsername)
+                    .password(mMqttPassword.getBytes())
                     .applySimpleAuth()
                     .send()
                     .whenComplete((mqtt3ConnAck, throwable) -> {
@@ -467,23 +513,23 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void startLivestream(Context context) {
-        showToast("Starting livestream to " + mRTMPServerURL);
+        showToast("Starting livestream to " + mRtmpServerURI);
         if (!isLiveStreamManagerOn()) {
             return;
         }
         if (DJISDKManager.getInstance().getLiveStreamManager().isStreaming()) {
-            Log.d("LIVESTREAM STARTED", mRTMPServerURL);
+            Log.d("LIVESTREAM STARTED", mRtmpServerURI);
             return;
         }
         new Thread() {
             @Override
             public void run() {
-                DJISDKManager.getInstance().getLiveStreamManager().setLiveUrl(mRTMPServerURL);
+                DJISDKManager.getInstance().getLiveStreamManager().setLiveUrl(mRtmpServerURI);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveVideoResolution(LiveVideoResolution.VIDEO_RESOLUTION_960_720);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveVideoBitRateMode(LiveVideoBitRateMode.AUTO);
                 DJISDKManager.getInstance().getLiveStreamManager().setAudioStreamingEnabled(false);
                 int result = DJISDKManager.getInstance().getLiveStreamManager().startStream();
-                context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).edit().putString(URL_KEY, mRTMPServerURL).commit();
+                context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).edit().putString(URL_KEY, mRtmpServerURI).commit();
                 Log.d("START LIVESTREAM", "startLive:" + result +
                         "\n isVideoStreamSpeedConfigurable:" + DJISDKManager.getInstance().getLiveStreamManager().isVideoStreamSpeedConfigurable() +
                         "\n isLiveAudioEnabled:" + DJISDKManager.getInstance().getLiveStreamManager().isLiveAudioEnabled());
