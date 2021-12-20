@@ -1,6 +1,6 @@
 package com.cadit.djicamera;
 
-import androidx.annotation.NonNull;
+import  androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -64,7 +64,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private LiveStreamManager.OnLiveChangeListener mListener;
 
     private String mRtmpServerURI = "";
-    private String mMqttBrokerURI = "192.168.100.5";
+    private String mMqttBrokerURI = "";
     private String mMqttUsername = "";
     private String mMqttPassword = "";
 
@@ -114,7 +114,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_home);
         initUI(this);
         initListener();
-        initMQTTClient();
 
         // Register the broadcast receiver for receiving the device connection's changes.
         IntentFilter filter = new IntentFilter();
@@ -187,33 +186,35 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
                         @Override
                         public void onProductDisconnect() {
-                            Log.d(TAG, "onProductDisconnect");
-                            stopLivestream();
+                            Log.v(TAG, "onProductDisconnect");
+
+                            stopBridge();
                             unregisterLSListener();
                             mProduct = null;
-
                             refreshSDKRelativeUI();
-                            showToast("Product disconnected");
 
+                            showToast("Product disconnected");
                         }
                         @Override
                         public void onProductConnect(BaseProduct baseProduct) {
-                            Log.d(TAG, String.format("onProductConnect newProduct:%s", baseProduct));
+                            Log.v(TAG, String.format("onProductConnect newProduct:%s", baseProduct));
+
                             mProduct = DJISDKManager.getInstance().getProduct();
                             registerLSListener();
-
                             refreshSDKRelativeUI();
-                            showToast("Product connected");
 
+                            showToast("Product connected");
                         }
 
                         @Override
                         public void onProductChanged(BaseProduct baseProduct) {
-                            stopLivestream();
+                            Log.v(TAG, String.format("onProductChanged newProduct:%s", baseProduct));
+
+                            stopBridge();
                             mProduct = DJISDKManager.getInstance().getProduct();
                             registerLSListener();
-
                             refreshSDKRelativeUI();
+
                             showToast("Product changed");
                         }
 
@@ -226,7 +227,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
                                     @Override
                                     public void onConnectivityChange(boolean isConnected) {
-                                        Log.d(TAG, "onComponentConnectivityChanged: " + isConnected);
+                                        Log.v(TAG, "onComponentConnectivityChanged: " + isConnected);
                                     }
                                 });
                             }
@@ -350,12 +351,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    private void initMQTTClient() {
-        mMqttClient = MqttClient.builder()
-                .useMqttVersion3()
-                .serverHost(mMqttBrokerURI)
-                .serverPort(MQTT_PORT)
-                .buildAsync();
+    private void setInputTextEnable(Boolean bool) {
+        mEditRTMPServerURI.setEnabled(bool);
+        mEditMQTTBrokerURI.setEnabled(bool);
+        mEditMQTTUsername.setEnabled(bool);
+        mEditMQTTPassword.setEnabled(bool);
     }
 
     private void showToast(final String toastMsg) {
@@ -424,7 +424,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.button_start: {
-                toggleStartButton();
+                if (mBtnToggleStartStop.getText().toString() == getResources().getString(R.string.button_start)) startBridge();
+                else stopBridge();
                 break;
             }
             
@@ -440,34 +441,46 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    private void toggleStartButton() {
-        if (mBtnToggleStartStop.getText().toString() == getResources().getString(R.string.button_start)) {
-            Log.v(TAG, "STARTING MOBILE BRIDGE");
-            mEditRTMPServerURI.setEnabled(false);
+    private void startBridge() {
+        Log.v(TAG, "STARTING MOBILE BRIDGE");
+        setInputTextEnable(false);
 
-            connectMQTTClient();
-            startLivestream(this);
-            startObstacleDetection();
+        initMQTTClient();
+        connectMQTTClient();
+        startLivestream(this);
+        startObstacleDetection();
 
-            mBtnToggleStartStop.setText(R.string.button_stop);
-            mBtnCheckLivestream.setVisibility(View.VISIBLE);
-            mBtnShowInfo.setVisibility(View.VISIBLE);
-        } else {
-            Log.v(TAG, "STOPPING MOBILE BRIDGE");
-            mEditRTMPServerURI.setEnabled(true);
+        mBtnToggleStartStop.setText(R.string.button_stop);
+        mBtnCheckLivestream.setVisibility(View.VISIBLE);
+        mBtnShowInfo.setVisibility(View.VISIBLE);
+    }
 
-            stopLivestream();
-            disconnectMQTTClient();
+    private void stopBridge() {
+        Log.v(TAG, "STOPPING MOBILE BRIDGE");
+        setInputTextEnable(true);
 
-            mBtnToggleStartStop.setText(R.string.button_start);
-            mBtnCheckLivestream.setVisibility(View.GONE);
-            mBtnShowInfo.setVisibility(View.GONE);
+        stopLivestream();
+        disconnectMQTTClient();
+
+        mBtnToggleStartStop.setText(R.string.button_start);
+        mBtnCheckLivestream.setVisibility(View.GONE);
+        mBtnShowInfo.setVisibility(View.GONE);
+    }
+
+    private void initMQTTClient() {
+        if (mMqttClient == null) {
+            mMqttClient = MqttClient.builder()
+                    .useMqttVersion3()
+                    .serverHost(mMqttBrokerURI)
+                    .serverPort(MQTT_PORT)
+                    .buildAsync();
         }
     }
 
     @SuppressLint("NewApi")
     private void connectMQTTClient() {
-        if (mMqttClient != null) {
+        if (mMqttClient != null &&
+            !mMqttClient.getState().isConnectedOrReconnect()) {
             showToast("Connecting to MQTT server");
             Log.v(TAG, "Connecting to MQTT server");
 
@@ -486,14 +499,17 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                             Log.v(TAG, "MQTT server connected");
                         }
                     });
+        } else if (mMqttClient == null){
+            Log.e(TAG, "MQTT client is not initialized");
         } else {
-            Log.e(TAG, "MQTT client have not been initialized");
+            Log.e(TAG, "MQTT client already connected");
         }
     }
 
     @SuppressLint("NewApi")
     private void disconnectMQTTClient() {
-        if (mMqttClient != null) {
+        if (mMqttClient != null &&
+            mMqttClient.getState().isConnected()) {
             showToast("Disconnecting from MQTT server");
             Log.v(TAG, "Disconnecting from MQTT server");
 
@@ -507,8 +523,10 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                             Log.v(TAG, "MQTT server disconnected");
                         }
                     });
+        } else if (mMqttClient == null){
+            Log.e(TAG, "MQTT client is not initialized");
         } else {
-            Log.e(TAG, "MQTT client have not been initialized");
+            Log.e(TAG, "MQTT client already disconnected");
         }
     }
 
@@ -609,18 +627,22 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     @SuppressLint("NewApi")
     private void mqttPublish(String topic, String payload) {
-        mMqttClient.publishWith()
+        if (mMqttClient != null && mMqttClient.getState().isConnected()) {
+            mMqttClient.publishWith()
                 .topic(topic)
                 .payload(payload.getBytes())
                 .qos(MqttQos.AT_LEAST_ONCE)
                 .send()
                 .whenComplete((pubMsg, throwable) -> {
                     if (throwable != null) {
-                        Log.e(TAG, throwable.toString());
+                        Log.e(TAG, "Failed to publish message: " + throwable.toString());
                     } else {
                         Log.v(TAG, pubMsg.toString());
                     }
                 });
+        } else {
+            Log.e(TAG, "Failed to publish MQTT, MQTT client isn't connected");
+        }
     }
 
     private void showLiveStreamStatus() {

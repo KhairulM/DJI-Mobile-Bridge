@@ -70,6 +70,7 @@ android {
         pickFirst 'lib/*/libDJIFlySafeCore.so'
         pickFirst 'lib/*/libdjifs_jni.so'
         pickFirst 'lib/*/libsfjni.so'
+        exclude 'META-INF/DEPENDENCIES'
         exclude 'META-INF/proguard/okhttp3.pro'
         exclude 'META-INF/rxjava.properties'
         exclude 'META-INF/INDEX.LIST'
