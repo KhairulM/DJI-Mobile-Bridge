@@ -11,16 +11,21 @@
     <string name="component_listview_live_stream">Live Stream</string>
     <string name="success">Success</string>
     <string name="rtmp_edit_hint">RTMP Server URI</string>
-    <string name="button_start">START</string>
-    <string name="product_default_name">No Product Connected</string>
-    <string name="product_default_status">Unconnected</string>
+    <string name="button_start_livestream">START LIVESTREAM</string>
+    <string name="product_name_default">No Product Connected</string>
+    <string name="product_status_default">Unconnected</string>
     <string name="firmware_default_text">Firmware version: N/A</string>
     <string name="sdk_default_text">DJI SDK version: N/A</string>
-    <string name="button_stop">STOP</string>
+    <string name="button_stop_livestream">STOP LIVESTREAM</string>
     <string name="text_cadit_iot_centre">CAD-IT IoT Centre</string>
     <string name="button_check_livestream">Is Livestream On</string>
     <string name="button_show_ifno">Show Livestream Info</string>
     <string name="mqtt_broker_edit_hint">MQTT Broker IP Address</string>
     <string name="mqtt_username_edit_hint">MQTT Username (optional)</string>
     <string name="mqtt_password_edit_hint">MQTT Password (optional)</string>
+    <string name="button_start_obstacle">START OBSTACLE MEASUREMENTS</string>
+    <string name="button_stop_obstacle">STOP OBSTACLE MEASUREMENTS</string>
+    <string name="button_start_control">START FLIGHT CONTROL</string>
+    <string name="button_stop_control">STOP FLIGHT CONTROL</string>
+    <string name="product_name_unknown">Unknown DJI Product</string>
 </resources>

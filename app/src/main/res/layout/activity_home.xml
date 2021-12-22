@@ -9,7 +9,7 @@
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:paddingBottom="32dp"
         tools:context=".HomeActivity">
 
@@ -19,7 +19,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="64dp"
             android:fontFamily="sans-serif-light"
-            android:text="@string/product_default_name"
+            android:text="@string/product_information"
             android:textAlignment="center"
             android:textColor="@color/black"
             android:textSize="48sp"
@@ -34,7 +34,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:fontFamily="sans-serif-medium"
-            android:text="@string/product_default_status"
+            android:text="@string/product_status_default"
             android:textColor="@color/black"
             android:textSize="16sp"
             android:visibility="gone"
@@ -129,19 +129,49 @@
             app:layout_constraintTop_toBottomOf="@+id/edit_text_mqtt_username" />
 
         <Button
-            android:id="@+id/button_start"
+            android:id="@+id/button_start_livestream"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginTop="16dp"
             android:layout_marginEnd="16dp"
             android:background="@drawable/primary_button"
-            android:text="@string/button_start"
+            android:text="@string/button_start_livestream"
             android:textColor="@color/colorWhite"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="1.0"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/edit_text_mqtt_password" />
+
+        <Button
+            android:id="@+id/button_start_obstacle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/primary_button"
+            android:text="@string/button_start_obstacle"
+            android:textColor="@color/colorWhite"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/button_start_livestream" />
+
+        <Button
+            android:id="@+id/button_start_control"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/primary_button"
+            android:text="@string/button_start_control"
+            android:textColor="@color/colorWhite"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/button_start_obstacle" />
 
         <TextView
             android:id="@+id/text_firmware_version"
@@ -154,7 +184,7 @@
             android:textColor="@color/black"
             android:textSize="12sp"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/button_start" />
+            app:layout_constraintTop_toBottomOf="@+id/button_start_control" />
 
         <TextView
             android:id="@+id/text_sdk_version"
@@ -167,38 +197,6 @@
             android:textSize="12sp"
             app:layout_constraintBaseline_toBaselineOf="@+id/text_firmware_version"
             app:layout_constraintEnd_toEndOf="parent" />
-
-        <Button
-            android:id="@+id/button_check_livestream"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/primary_button"
-            android:text="@string/button_check_livestream"
-            android:textColor="@color/colorWhite"
-            android:visibility="gone"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.5"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/text_sdk_version" />
-
-        <Button
-            android:id="@+id/button_show_info"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/primary_button"
-            android:text="@string/button_show_ifno"
-            android:textColor="@color/colorWhite"
-            android:visibility="gone"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.0"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/button_check_livestream" />
 
 
     </androidx.constraintlayout.widget.ConstraintLayout>
