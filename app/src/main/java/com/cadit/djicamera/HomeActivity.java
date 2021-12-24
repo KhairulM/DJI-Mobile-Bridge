@@ -28,9 +28,11 @@ import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import dji.common.battery.BatteryState;
 import dji.common.error.DJIError;
 import dji.common.error.DJISDKError;
 import dji.common.flightcontroller.FlightControllerState;
@@ -53,9 +55,20 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     private static final String TAG = HomeActivity.class.getName();
     private static final String URL_KEY = "sp_stream_url";
+    private static final int MQTT_PORT = 1883;
     private static final String TOPIC_OBSTACLE_DISTANCE = "dji/obstacle/distance";
     private static final String TOPIC_OBSTACLE_WARNING = "dji/obstacle/warning";
-    private static final int MQTT_PORT = 1883;
+    private static final String TOPIC_CONTROL_ROLL = "dji/control/roll";
+    private static final String TOPIC_CONTROL_PITCH = "dji/control/pitch";
+    private static final String TOPIC_CONTROL_YAW = "dji/control/yaw";
+    private static final String TOPIC_CONTROL_VERTICAL_THROTTLE = "dji/control/vertical-throttle";
+    private static final String TOPIC_MODEL_NAME = "dji/model/name";
+    private static final String TOPIC_STATUS_CONNECTION = "dji/status/connection";
+    private static final String TOPIC_STATUS_FLIGHT_MODE = "dji/status/flight-mode";
+    private static final String TOPIC_STATUS_BATTERY = "dji/status/battery";
+    private static final String TOPIC_STATUS_ALTITUDE = "dji/status/altitude";
+    private static final String TOPIC_STATUS_VERTICAL_SPEED = "dji/status/vertical-speed";
+    private static final String TOPIC_STATUS_HORIZONTAL_SPEED = "dji/status/horizontal-speed";
 
     private enum BUTTONS {
         LIVESTREAM,
@@ -65,7 +78,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     private Mqtt3AsyncClient mMqttClient = null;
 
-    private BaseProduct mProduct = null;
+    private Aircraft mProduct = null;
     private FlightMode mFlightMode = null;
     private LiveStreamManager.OnLiveChangeListener mListener;
 
@@ -188,7 +201,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
                             mProduct = null;
                             unregisterLivestreamListener();
-                            unregisterFlightControllerListener();
 
                             refreshSDKRelativeUI();
                             showToast("Product disconnected");
@@ -197,12 +209,21 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         public void onProductConnect(BaseProduct baseProduct) {
                             Log.v(TAG, String.format("onProductConnect newProduct:%s", baseProduct));
 
-                            mProduct = DJISDKManager.getInstance().getProduct();
-                            registerLivestreamListener();
-                            registerFlightControllerListener();
+                            if (DJISDKManager.getInstance().getProduct() instanceof Aircraft) {
+                                mProduct = (Aircraft) DJISDKManager.getInstance().getProduct();
 
-                            refreshSDKRelativeUI();
-                            showToast("Product connected");
+                                registerLivestreamListener();
+                                setFlightControllerCallback();
+                                setBatteryCallback();
+                                publishStatusConnection(true);
+                                publishModelName();
+
+                                refreshSDKRelativeUI();
+                                showToast("Product connected");
+                            } else {
+                                showToast("Connected product is not a DJI Aircraft");
+                                Log.e(TAG, "Connected product is not a DJI Aircraft");
+                            }
                         }
 
                         @Override
@@ -212,9 +233,9 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                             onClickStop(BUTTONS.OBSTACLE);
                             onClickStop(BUTTONS.CONTROL);
 
-                            mProduct = DJISDKManager.getInstance().getProduct();
+                            mProduct = (Aircraft) DJISDKManager.getInstance().getProduct();
                             registerLivestreamListener();
-                            registerFlightControllerListener();
+                            setFlightControllerCallback();
 
                             refreshSDKRelativeUI();
 
@@ -381,7 +402,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         DJISDKManager.getInstance().getLiveStreamManager().unregisterListener(mListener);
     }
 
-    private void registerFlightControllerListener() {
+    private void setFlightControllerCallback() {
         if (ModuleVerificationUtil.isFlightControllerAvailable()) {
             FlightController fc = ((Aircraft) mProduct).getFlightController();
 
@@ -392,9 +413,23 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         fc.setStateCallback(new FlightControllerState.Callback() {
                             @Override
                             public void onUpdate(@NonNull FlightControllerState flightControllerState) {
-                                mTextConnectionStatus.setText("Fight mode: " + flightControllerState.getFlightModeString());
+                                Aircraft product = (Aircraft) DJISDKManager.getInstance().getProduct();
+
+                                mTextConnectionStatus.setText("Flight mode: " + flightControllerState.getFlightModeString());
                                 mFlightMode = flightControllerState.getFlightMode();
-                                mBtnToggleControl.setEnabled(fc.isVirtualStickControlModeAvailable());
+                                mBtnToggleControl.setEnabled(product.getFlightController().isVirtualStickControlModeAvailable());
+
+                                if (isMqttConnected()) {
+                                    // publish status topic
+                                    mqttPublish(TOPIC_STATUS_ALTITUDE, Float.toString(flightControllerState.getAircraftLocation().getAltitude()), MqttQos.EXACTLY_ONCE);
+                                    mqttPublish(TOPIC_STATUS_VERTICAL_SPEED, Float.toString(flightControllerState.getVelocityZ()), MqttQos.EXACTLY_ONCE);
+
+                                    List<Float> horSpeed = Arrays.asList(flightControllerState.getVelocityX(), flightControllerState.getVelocityY());
+                                    mqttPublish(TOPIC_STATUS_HORIZONTAL_SPEED, horSpeed.toString(), MqttQos.EXACTLY_ONCE);
+
+                                    // publish flight mode
+                                    mqttPublish(TOPIC_STATUS_FLIGHT_MODE, flightControllerState.getFlightModeString());
+                                }
                             }
                         });
                     }
@@ -403,21 +438,30 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    private void unregisterFlightControllerListener() {
-        mFlightMode = null;
-        mBtnToggleControl.setEnabled(false);
-
-        if (ModuleVerificationUtil.isFlightControllerAvailable()) {
-            FlightController fc = ((Aircraft) mProduct).getFlightController();
-
-            if (fc != null) {
-                fc.setStateCallback(new FlightControllerState.Callback() {
+    private void setBatteryCallback () {
+        new Thread() {
+            public void run() {
+                mProduct.getBattery().setStateCallback(new BatteryState.Callback() {
                     @Override
-                    public void onUpdate(@NonNull FlightControllerState flightControllerState) {
-                        return;
+                    public void onUpdate(BatteryState batteryState) {
+                        if (isMqttConnected()) {
+                            mqttPublish(TOPIC_STATUS_BATTERY, Integer.toString(batteryState.getChargeRemainingInPercent()));
+                        }
                     }
                 });
             }
+        }.start();
+    }
+
+    private void publishStatusConnection(boolean state) {
+        if (isMqttConnected()) {
+            mqttPublish(TOPIC_STATUS_CONNECTION, state ? "true":"false");
+        }
+    }
+
+    private void publishModelName() {
+        if (isMqttConnected()) {
+            mqttPublish(TOPIC_MODEL_NAME, mProduct.getModel().getDisplayName());
         }
     }
 
@@ -441,8 +485,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         if (isProductConnected()) {
             Log.v(TAG, "refreshSDK: True");
 
-            String str = mProduct instanceof Aircraft ? "DJIAircraft":"DJIHandHeld";
-            mTextConnectionStatus.setText("Status: " + str + " connected");
+            mTextConnectionStatus.setText("Status: DJIAircraft connected");
             mTextConnectionStatus.setVisibility(View.VISIBLE);
 
             if (mProduct.getFirmwarePackageVersion() != null) {
@@ -535,13 +578,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void initMQTTClient() {
-        if (mMqttClient == null) {
-            mMqttClient = MqttClient.builder()
-                    .useMqttVersion3()
-                    .serverHost(mMqttBrokerURI)
-                    .serverPort(MQTT_PORT)
-                    .buildAsync();
-        }
+        mMqttClient = MqttClient.builder()
+                .useMqttVersion3()
+                .serverHost(mMqttBrokerURI)
+                .serverPort(MQTT_PORT)
+                .buildAsync();
     }
 
     @SuppressLint("NewApi")
