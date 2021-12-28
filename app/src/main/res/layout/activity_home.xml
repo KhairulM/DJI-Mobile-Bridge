@@ -129,6 +129,21 @@
             app:layout_constraintTop_toBottomOf="@+id/edit_text_mqtt_username" />
 
         <Button
+            android:id="@+id/button_connect_disconnect"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/primary_button"
+            android:text="@string/button_connect"
+            android:textColor="@color/colorWhite"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/edit_text_mqtt_password" />
+
+        <Button
             android:id="@+id/button_start_livestream"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -138,25 +153,11 @@
             android:background="@drawable/primary_button"
             android:text="@string/button_start_livestream"
             android:textColor="@color/colorWhite"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="1.0"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/edit_text_mqtt_password" />
-
-        <Button
-            android:id="@+id/button_start_obstacle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/primary_button"
-            android:text="@string/button_start_obstacle"
-            android:textColor="@color/colorWhite"
+            android:visibility="gone"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/button_start_livestream" />
+            app:layout_constraintTop_toBottomOf="@+id/text_sdk_version" />
 
         <Button
             android:id="@+id/button_start_control"
@@ -168,10 +169,11 @@
             android:background="@drawable/primary_button"
             android:text="@string/button_start_control"
             android:textColor="@color/colorWhite"
+            android:visibility="gone"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/button_start_obstacle" />
+            app:layout_constraintTop_toBottomOf="@+id/button_start_livestream" />
 
         <TextView
             android:id="@+id/text_firmware_version"
@@ -184,7 +186,7 @@
             android:textColor="@color/black"
             android:textSize="12sp"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/button_start_control" />
+            app:layout_constraintTop_toBottomOf="@+id/button_connect_disconnect" />
 
         <TextView
             android:id="@+id/text_sdk_version"
@@ -197,6 +199,20 @@
             android:textSize="12sp"
             app:layout_constraintBaseline_toBaselineOf="@+id/text_firmware_version"
             app:layout_constraintEnd_toEndOf="parent" />
+
+        <Button
+            android:id="@+id/button_check_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:text="@string/button_check_status"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/button_start_control" />
 
 
     </androidx.constraintlayout.widget.ConstraintLayout>
