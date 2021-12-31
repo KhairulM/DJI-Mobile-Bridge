@@ -49,6 +49,7 @@ import dji.sdk.base.BaseProduct;
 import dji.sdk.flightcontroller.FlightAssistant;
 import dji.sdk.flightcontroller.FlightController;
 import dji.sdk.products.Aircraft;
+import dji.sdk.products.HandHeld;
 import dji.sdk.sdkmanager.DJISDKInitEvent;
 import dji.sdk.sdkmanager.DJISDKManager;
 import dji.sdk.sdkmanager.LiveStreamManager;
@@ -143,6 +144,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             ActivityCompat.requestPermissions(this,
                     missingPermission.toArray(new String[missingPermission.size()]),
                     REQUEST_PERMISSION_CODE);
+        } else if (missingPermission.isEmpty()) {
+            startSDKRegistration();
         }
 
     }
@@ -205,9 +208,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                             if (baseProduct instanceof Aircraft) {
                                 mAircraft = (Aircraft) baseProduct;
                                 refreshSDKRelativeUI();
+                            } else if (baseProduct instanceof HandHeld) {
+                                showToast("Remote controller connected");
                             } else {
-                                showToast("Connected product is not a DJI Aircraft");
-                                Log.e(TAG, "Connected product is not a DJI Aircraft");
+                                showToast("Connected product is not a DJI product");
+                                Log.e(TAG, "Connected product is not a DJI product");
                             }
                         }
 
@@ -218,9 +223,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                             if (baseProduct instanceof Aircraft) {
                                 mAircraft = (Aircraft) baseProduct;
                                 refreshSDKRelativeUI();
+                            } else if (baseProduct instanceof HandHeld) {
+                                showToast("Remote controller connected");
                             } else {
-                                showToast("Connected product is not a DJI Aircraft");
-                                Log.e(TAG, "Connected product is not a DJI Aircraft");
+                                showToast("Connected product is not a DJI product");
+                                Log.e(TAG, "Connected product is not a DJI product");
                             }
                         }
 
@@ -725,20 +732,19 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             fc.setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
             fc.setVerticalControlMode(VerticalControlMode.POSITION);
 
-            // subscribing to control topics
-            Consumer<Mqtt3Publish> controlCb = (msg) -> {
-                Log.v(TAG, "Control received: " + msg.getPayloadAsBytes().toString());
-                String payload = msg.getPayloadAsBytes().toString();
+            mMqttClient.subscribe(TOPIC_CONTROL, (message) -> {
+                Log.v(TAG, "Control received: " + message.getPayloadAsBytes().toString());
+                String payload = message.getPayloadAsBytes().toString();
 
                 payload = payload.substring(1, payload.length()-1);
                 String[] strControls = payload.split(",");
 
                 FlightControlData newControl = new FlightControlData(
-                                                    Float.parseFloat(strControls[0]),
-                                                    Float.parseFloat(strControls[1]),
-                                                    Float.parseFloat(strControls[2]),
-                                                    Float.parseFloat(strControls[3])
-                                                );
+                        Float.parseFloat(strControls[0]),
+                        Float.parseFloat(strControls[1]),
+                        Float.parseFloat(strControls[2]),
+                        Float.parseFloat(strControls[3])
+                );
 
                 mAircraft.getFlightController().sendVirtualStickFlightControlData(newControl, new CommonCallbacks.CompletionCallback() {
                     @Override
@@ -746,13 +752,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         if (djiError != null) {
                             Log.e(TAG, "Failed to send virtual stick control data");
                         } else {
-                            Log.v(TAG, "Control sent: " + msg.getPayloadAsBytes().toString());
+                            Log.v(TAG, "Control sent: " + message.getPayloadAsBytes().toString());
                         }
                     }
                 });
-            };
-
-            mMqttClient.subscribe(TOPIC_CONTROL, controlCb);
+            });
         } else {
             showToast("Virtual stick control mode not available");
         }
@@ -763,13 +767,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             showToast("Stopping flight control");
 
             mMqttClient.unsubscribe(TOPIC_CONTROL);
-
-            // set control mode
-            FlightController fc = mAircraft.getFlightController();
-            fc.setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
-            fc.setRollPitchControlMode(RollPitchControlMode.VELOCITY);
-            fc.setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
-            fc.setVerticalControlMode(VerticalControlMode.POSITION);
         }
     }
 
