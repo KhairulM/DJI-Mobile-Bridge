@@ -388,6 +388,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private boolean isAircraftConnected() {
         return mAircraft != null && mAircraft.isConnected();
     }
+    private boolean isMqttConnected() {return mMqttClient != null && mMqttClient.isMqttConnected();}
 
     private boolean isFlightControllerAvailable() {
         return isAircraftConnected() && mAircraft.getFlightController() != null;
@@ -420,7 +421,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 mTextProduct.setText(R.string.product_name_unknown);
             }
 
-            if (mMqttClient.isMqttConnected()) {
+            if (isMqttConnected()) {
                 mBtnToggleLivestream.setVisibility(View.VISIBLE);
                 mBtnToggleControl.setVisibility(View.VISIBLE);
                 mBtnCheckStatus.setVisibility(View.VISIBLE);
@@ -583,7 +584,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                                 mTextConnectionStatus.setText("Flight mode: " + flightControllerState.getFlightModeString());
                                 mBtnToggleControl.setEnabled(product.getFlightController().isVirtualStickControlModeAvailable());
 
-                                if (mMqttClient.isMqttConnected()) {
+                                if (isMqttConnected()) {
                                     // publish status topic
                                     mMqttClient.publish(TOPIC_STATUS_ALTITUDE, Float.toString(flightControllerState.getAircraftLocation().getAltitude()), MqttQos.EXACTLY_ONCE);
                                     mMqttClient.publish(TOPIC_STATUS_VERTICAL_SPEED, Float.toString(flightControllerState.getVelocityZ()), MqttQos.EXACTLY_ONCE);
@@ -608,7 +609,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 mAircraft.getBattery().setStateCallback(new BatteryState.Callback() {
                     @Override
                     public void onUpdate(BatteryState batteryState) {
-                        if (mMqttClient.isMqttConnected()) {
+                        if (isMqttConnected()) {
                             mMqttClient.publish(TOPIC_STATUS_BATTERY, Integer.toString(batteryState.getChargeRemainingInPercent()));
                         }
                     }
@@ -677,13 +678,13 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void publishStatusConnection(boolean state) {
-        if (mMqttClient.isMqttConnected()) {
+        if (isMqttConnected()) {
             mMqttClient.publish(TOPIC_STATUS_CONNECTION, state ? "true":"false");
         }
     }
 
     private void publishModelName() {
-        if (mMqttClient.isMqttConnected()) {
+        if (isMqttConnected()) {
             mMqttClient.publish(TOPIC_MODEL_NAME, mAircraft.getModel().getDisplayName());
         }
     }
