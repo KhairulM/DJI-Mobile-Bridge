@@ -39,7 +39,7 @@ public class CustomMqttClient {
                     .password(password.getBytes())
                     .applySimpleAuth()
                     .send();
-
+            Log.v(mTag, "MQTT broker connected");
             return true;
         } catch (Exception e) {
             Log.e(mTag, e.toString());
@@ -51,6 +51,7 @@ public class CustomMqttClient {
     public synchronized boolean disconnect () {
         try {
             mClient.toBlocking().disconnect();
+            Log.v(mTag, "MQTT broker disconnected");
             return true;
         } catch (Exception e) {
             Log.e(mTag, e.toString());

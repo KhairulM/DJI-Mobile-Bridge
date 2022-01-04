@@ -5,7 +5,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:keepScreenOn="true">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -116,7 +117,7 @@
             android:background="@drawable/primary_text_input"
             android:ems="10"
             android:hint="@string/mqtt_password_edit_hint"
-            android:inputType="textPersonName"
+            android:inputType="textPassword"
             android:padding="12dp"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
@@ -208,7 +209,9 @@
             android:layout_marginTop="16dp"
             android:layout_marginEnd="16dp"
             android:text="@string/button_check_status"
+            android:textColor="@color/colorWhite"
             android:visibility="gone"
+            android:background="@drawable/primary_button"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.5"
             app:layout_constraintStart_toStartOf="parent"
