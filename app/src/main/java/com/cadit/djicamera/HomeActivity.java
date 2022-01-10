@@ -6,7 +6,10 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -59,6 +62,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     private static final String TAG = HomeActivity.class.getName();
     private static final String URL_KEY = "sp_stream_url";
+    private static final Integer DEFAULT_MQTT_PORT = 1883;
 
     // MQTT TOPICS
     private static final String TOPIC_OBSTACLE_DISTANCE = "dji/obstacle/distance";
@@ -122,6 +126,13 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private AtomicBoolean isRegistrationInProgress = new AtomicBoolean(false);
     private static final int REQUEST_PERMISSION_CODE = 96385;
 
+//    protected BroadcastReceiver mReceiver = new BroadcastReceiver() {
+//        @Override
+//        public void onReceive(Context context, Intent intent) {
+//            refreshSDKRelativeUI();
+//        }
+//    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -129,6 +140,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_home);
         initUI(this);
         initListener();
+
+        // Register the broadcast receiver for receiving the device connection's changes.
+//        IntentFilter filter = new IntentFilter();
+//        filter.addAction(FPVDemoApplication.FLAG_CONNECTION_CHANGE);
+//        registerReceiver(mReceiver, filter);
     }
 
     /**
@@ -150,7 +166,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         } else if (missingPermission.isEmpty()) {
             startSDKRegistration();
         }
-
     }
 
     /**
@@ -285,7 +300,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
         mBtnToggleConnect = (Button) findViewById(R.id.button_connect_disconnect);
 //        TODO: UNCOMMENT THIS LINE BEFORE TESTING WITH DJI DRONE
-//        mBtnToggleConnect.setEnabled(false);
+        mBtnToggleConnect.setEnabled(false);
         mBtnToggleConnect.setOnClickListener(this);
 
         mBtnToggleLivestream = (Button) findViewById(R.id.button_start_livestream);
@@ -314,10 +329,12 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         mEditMQTTBrokerURI.addTextChangedListener(new CustomTextWatcher(mEditMQTTBrokerURI) {
             @Override
             public void validate(TextView textView, String text) {
-                mMqttBrokerURI = text;
                 mIsMqttURIValid = mqttRegexp.matcher(text).matches();
 
-                // TODO: SET MQTT PORT IF USER INPUT PORT AS WELL
+                String[] split = text.split(":");
+                mMqttBrokerURI = split[0];
+                if (split.length > 1) mMqttPort = Integer.valueOf(split[1]);
+                else mMqttPort = DEFAULT_MQTT_PORT;
 
                 setConnectButtonEnabled();
             }
@@ -352,9 +369,9 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         {
             mBtnToggleConnect.setEnabled(true);
         } else {
-            mBtnToggleConnect.setEnabled(true);
+//            mBtnToggleConnect.setEnabled(true);
 //            TODO: UNCOMMENT THIS LINE BEFORE TESTING WITH DJI DRONE
-//            mBtnToggleConnect.setEnabled(false);
+            mBtnToggleConnect.setEnabled(false);
         }
     }
 
@@ -378,6 +395,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private boolean isAircraftConnected() {
         return mAircraft != null && mAircraft.isConnected();
     }
+
     private boolean isMqttConnected() {return mMqttClient != null && mMqttClient.isMqttConnected();}
 
     private boolean isFlightControllerAvailable() {
@@ -395,22 +413,22 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     private void refreshSDKRelativeUI() {
 //        TODO: REMOVE "!" FROM THIS LINE BEFORE TESTING WITH DJI DRONE
-        if (!isAircraftConnected()) {
+        if (isAircraftConnected()) {
             Log.v(TAG, "refreshSDK: True");
 
             setConnectButtonEnabled();
             mTextConnectionStatus.setText("Status: DJIAircraft connected");
             mTextConnectionStatus.setVisibility(View.VISIBLE);
-//            TODO: UNCOMMENT THIS LINE BEFORE TESTING WITH DJI DRONE
-//            if (mAircraft.getFirmwarePackageVersion() != null) {
-//                mTextFirmwareVersion.setText("Firmware version: " + mAircraft.getFirmwarePackageVersion());
-//            }
-//
-//            if (mAircraft.getModel() != null) {
-//                mTextProduct.setText("" + mAircraft.getModel().getDisplayName());
-//            } else {
-//                mTextProduct.setText(R.string.product_name_unknown);
-//            }
+//            TODO: UNCOMMENT THIS LINES BEFORE TESTING WITH DJI DRONE
+            if (mAircraft.getFirmwarePackageVersion() != null) {
+                mTextFirmwareVersion.setText("Firmware version: " + mAircraft.getFirmwarePackageVersion());
+            }
+
+            if (mAircraft.getModel() != null) {
+                mTextProduct.setText("" + mAircraft.getModel().getDisplayName());
+            } else {
+                mTextProduct.setText(R.string.product_name_unknown);
+            }
 
             if (isMqttConnected()) {
                 mBtnToggleLivestream.setVisibility(View.VISIBLE);
@@ -792,12 +810,13 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onDestroy() {
         Log.e(TAG, "onDestroy");
+//        unregisterReceiver(mReceiver);
         super.onDestroy();
 
         if (isLivestreaming()) stopLivestream();
         if (mIsVirtualStickControlModeEnabled.get()) stopFlightControl();
 
-        mMqttClient.disconnect();
+        if (isMqttConnected()) mMqttClient.disconnect();
     }
 
     public void onReturn(View view){
