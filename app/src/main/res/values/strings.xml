@@ -30,4 +30,5 @@
     <string name="product_name_unknown">Unknown DJI Product</string>
     <string name="button_disconnect">DISCONNECT</string>
     <string name="button_check_status">CHECK STATUS</string>
+    <string name="flight_mode_format">Flight mode: %1$s</string>
 </resources>

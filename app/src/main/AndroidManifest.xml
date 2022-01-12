@@ -58,22 +58,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-<!--        <activity android:name=".MainActivityLiveStream" />-->
-<!--        <activity-->
-<!--            android:name=".ConnectionActivity"-->
-<!--            android:configChanges="orientation"-->
-<!--            android:screenOrientation="portrait"></activity>-->
-<!--        <activity-->
-<!--            android:name=".MainActivity"-->
-<!--            android:screenOrientation="landscape" />-->
-<!--        <activity-->
-<!--            android:name=".ObstacleActivity"-->
-<!--            android:screenOrientation="portrait" />-->
-<!--        <activity-->
-<!--            android:name=".JoystickActivity"-->
-<!--            android:screenOrientation="portrait" />-->
+        <activity android:name=".MainActivityLiveStream" />
         <activity
-            android:name=".DJIAoaControllerCompatActivity"
+            android:name=".ConnectionActivity"
+            android:configChanges="orientation"
+            android:screenOrientation="portrait"></activity>
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name=".ObstacleActivity"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".JoystickActivity"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name="dji.sdk.sdkmanager.DJIAoaControllerActivity"
             android:theme="@android:style/Theme.Translucent"
             android:exported="true">
             <intent-filter>

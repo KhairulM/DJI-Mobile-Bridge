@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
@@ -84,7 +85,7 @@ public class FPVDemoApplication extends Application{
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Toast.makeText(getApplicationContext(), "SDK register success", Toast.LENGTH_LONG).show();
+                            Toast.makeText(getApplicationContext(), "DJI SDK registration success", Toast.LENGTH_LONG).show();
                         }
                     });
                     DJISDKManager.getInstance().startConnectionToProduct();
@@ -92,7 +93,7 @@ public class FPVDemoApplication extends Application{
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Toast.makeText(getApplicationContext(), "SDK register fail", Toast.LENGTH_LONG).show();
+                            Toast.makeText(getApplicationContext(), "DJI SDK registration fails, check if network is available", Toast.LENGTH_LONG).show();
                         }
                     });
 
@@ -144,7 +145,7 @@ public class FPVDemoApplication extends Application{
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || (permissionCheck == 0 && permissionCheck2 == 0)) {
             //This is used to start SDK services and initiate SDK.
             DJISDKManager.getInstance().registerApp(getApplicationContext(), mDJISDKManagerCallback);
-            Toast.makeText(getApplicationContext(), "registering, pls wait...", Toast.LENGTH_LONG).show();
+            Toast.makeText(getApplicationContext(), "Registering DJI SDK", Toast.LENGTH_LONG).show();
 
         } else {
             Toast.makeText(getApplicationContext(), "Please check if the permission is granted.", Toast.LENGTH_LONG).show();

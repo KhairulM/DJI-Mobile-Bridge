@@ -124,14 +124,14 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     };
     private List<String> missingPermission = new ArrayList<>();
     private AtomicBoolean isRegistrationInProgress = new AtomicBoolean(false);
-    private static final int REQUEST_PERMISSION_CODE = 96385;
+    private static final int REQUEST_PERMISSION_CODE = 12345;
 
-//    protected BroadcastReceiver mReceiver = new BroadcastReceiver() {
-//        @Override
-//        public void onReceive(Context context, Intent intent) {
-//            refreshSDKRelativeUI();
-//        }
-//    };
+    protected BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            onConnectionChange();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -142,9 +142,9 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         initListener();
 
         // Register the broadcast receiver for receiving the device connection's changes.
-//        IntentFilter filter = new IntentFilter();
-//        filter.addAction(FPVDemoApplication.FLAG_CONNECTION_CHANGE);
-//        registerReceiver(mReceiver, filter);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(FPVDemoApplication.FLAG_CONNECTION_CHANGE);
+        registerReceiver(mReceiver, filter);
     }
 
     /**
@@ -163,8 +163,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             ActivityCompat.requestPermissions(this,
                     missingPermission.toArray(new String[missingPermission.size()]),
                     REQUEST_PERMISSION_CODE);
-        } else if (missingPermission.isEmpty()) {
-            startSDKRegistration();
         }
     }
 
@@ -203,8 +201,9 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         public void onRegister(DJIError djiError) {
                             if (djiError == DJISDKError.REGISTRATION_SUCCESS) {
                                 DJILog.e("App registration", DJISDKError.REGISTRATION_SUCCESS.getDescription());
-                                DJISDKManager.getInstance().startConnectionToProduct();
                                 showToast("DJI SDK registration success");
+
+                                DJISDKManager.getInstance().startConnectionToProduct();
                             } else {
                                 showToast( "DJI SDK registration fails, check if network is available");
                             }
@@ -213,40 +212,16 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
                         @Override
                         public void onProductDisconnect() {
-                            Log.v(TAG, "onProductDisconnect");
-                            publishStatusConnection(false);
-
-                            mAircraft = null;
-                            refreshSDKRelativeUI();
+                            onConnectionChange();
                         }
                         @Override
                         public void onProductConnect(BaseProduct baseProduct) {
-                            Log.v(TAG, String.format("onProductConnect newProduct:%s", baseProduct));
-
-                            if (baseProduct instanceof Aircraft) {
-                                mAircraft = (Aircraft) baseProduct;
-                                refreshSDKRelativeUI();
-                            } else if (baseProduct instanceof HandHeld) {
-                                showToast("Remote controller connected");
-                            } else {
-                                showToast("Connected product is not a DJI product");
-                                Log.e(TAG, "Connected product is not a DJI product");
-                            }
+                            onConnectionChange();
                         }
 
                         @Override
                         public void onProductChanged(BaseProduct baseProduct) {
-                            Log.v(TAG, String.format("onProductChanged newProduct:%s", baseProduct));
-
-                            if (baseProduct instanceof Aircraft) {
-                                mAircraft = (Aircraft) baseProduct;
-                                refreshSDKRelativeUI();
-                            } else if (baseProduct instanceof HandHeld) {
-                                showToast("Remote controller connected");
-                            } else {
-                                showToast("Connected product is not a DJI product");
-                                Log.e(TAG, "Connected product is not a DJI product");
-                            }
+                            onConnectionChange();
                         }
 
                         @Override
@@ -411,6 +386,45 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                mAircraft.getFlightController().isVirtualStickControlModeAvailable();
     }
 
+    private void onConnectionChange() {
+        if (isAircraftConnected()) return;
+
+        BaseProduct baseProduct = DJISDKManager.getInstance().getProduct();
+
+        if (baseProduct != null && baseProduct.isConnected()) {
+            try {
+                Log.v(TAG, "onProductConnect");
+
+                if (baseProduct instanceof Aircraft) {
+                    showToast("DJI aircraft connected");
+                    publishStatusConnection(true);
+
+                    mAircraft = (Aircraft) baseProduct;
+
+                    refreshSDKRelativeUI();
+                } else if (baseProduct instanceof HandHeld) {
+                    showToast("Remote controller connected");
+                } else {
+                    showToast("Connected product is not a DJI product");
+                    Log.e(TAG, "Connected product is not a DJI product");
+                }
+            } catch (Exception e) {
+                showToast(e.toString());
+                Log.e(TAG, e.toString());
+            }
+        } else {
+            try {
+                Log.v(TAG, "onProductDisconnect");
+                gracefullyDisconnect();
+
+                mAircraft = null;
+            } catch (Exception e) {
+                showToast(e.toString());
+                Log.e(TAG, e.toString());
+            }
+        }
+    }
+
     private void refreshSDKRelativeUI() {
 //        TODO: REMOVE "!" FROM THIS LINE BEFORE TESTING WITH DJI DRONE
         if (isAircraftConnected()) {
@@ -431,16 +445,16 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             }
 
             if (isMqttConnected()) {
+                mBtnToggleConnect.setText(R.string.button_disconnect);
+
                 mBtnToggleLivestream.setVisibility(View.VISIBLE);
                 mBtnToggleControl.setVisibility(View.VISIBLE);
                 mBtnCheckStatus.setVisibility(View.VISIBLE);
             } else {
-                mBtnToggleLivestream.setText(R.string.button_start_livestream);
+                mBtnToggleConnect.setText(R.string.button_connect);
+
                 mBtnToggleLivestream.setVisibility(View.GONE);
-
-                mBtnToggleControl.setText(R.string.button_start_control);
                 mBtnToggleControl.setVisibility(View.GONE);
-
                 mBtnCheckStatus.setVisibility(View.GONE);
             }
         } else {
@@ -464,6 +478,28 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+    private void gracefullyDisconnect() {
+        publishStatusConnection(false);
+
+        if (!mMqttClient.disconnect()) {
+            showToast("Failed to disconnect from MQTT broker");
+            return;
+        }
+
+        unregisterLivestreamListener();
+        setVirtualStickControlModeEnabled(false);
+
+        if (isLivestreaming()) {
+            stopLivestream();
+        }
+
+        if (mIsVirtualStickControlModeEnabled.get()) {
+            stopFlightControl();
+        }
+
+        refreshSDKRelativeUI();
+    }
+
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
@@ -476,36 +512,16 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         showToast("Failed to connect to MQTT broker");
                     } else {
                         registerLivestreamListener();
-                        setVirtualStickControlModeEnabled(true);
                         setFlightControllerCallback();
                         setObstacleCallback();
                         setBatteryCallback();
                         publishModelName();
                         publishStatusConnection(true);
 
-                        mBtnToggleConnect.setText(R.string.button_disconnect);
                         refreshSDKRelativeUI();
                     }
                 } else {
-                    publishStatusConnection(false);
-
-                    if (!mMqttClient.disconnect()) {
-                        showToast("Failed to disconnect from MQTT broker");
-                    } else {
-                        unregisterLivestreamListener();
-                        setVirtualStickControlModeEnabled(false);
-
-                        if (isLivestreaming()) {
-                            stopLivestream();
-                        }
-
-                        if (mIsVirtualStickControlModeEnabled.get()) {
-                            stopFlightControl();
-                        }
-
-                        mBtnToggleConnect.setText(R.string.button_connect);
-                        refreshSDKRelativeUI();
-                    }
+                    gracefullyDisconnect();
                 }
                 break;
             }
@@ -556,160 +572,126 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void setVirtualStickControlModeEnabled(boolean enabled) {
-        if (isFlightControllerAvailable()) {
-            mAircraft.getFlightController().setFlightOrientationMode(FlightOrientationMode.AIRCRAFT_HEADING, new CommonCallbacks.CompletionCallback() {
-                @Override
-                public void onResult(DJIError djiError) {
-                    if (djiError != null) {
-                        DJILog.e("Flight orientation mode", djiError.getDescription());
-                        showToast("Failed to set flight orientation mode");
-                    }
-                }
-            });
+        if (!isVirtualStickControlModeAvailable()) return;
 
-            // enabling virtual stick control mode
-            mAircraft.getFlightController().setVirtualStickModeEnabled(enabled, new CommonCallbacks.CompletionCallback() {
-                @Override
-                public void onResult(DJIError djiError) {
-                    if (djiError != null) {
-                        DJILog.e("Virtual stick enable", djiError.getDescription());
-                        showToast("Failed to set virtual stick control mode");
-                    } else {
-                        mIsVirtualStickControlModeEnabled.compareAndSet(!enabled, enabled);
-                    }
-                }
-            });
-        }
+        mAircraft.getFlightController().setFlightOrientationMode(FlightOrientationMode.AIRCRAFT_HEADING, djiError -> {
+            if (djiError != null) {
+                DJILog.e("Flight orientation mode", djiError.getDescription());
+                showToast("Failed to set flight orientation mode");
+            }
+        });
+
+        // enabling virtual stick control mode
+        mAircraft.getFlightController().setVirtualStickModeEnabled(enabled, djiError -> {
+            if (djiError != null) {
+                DJILog.e("Virtual stick enable", djiError.getDescription());
+                showToast("Failed to set virtual stick control mode");
+            } else {
+                mIsVirtualStickControlModeEnabled.compareAndSet(!enabled, enabled);
+            }
+        });
     }
 
     private void setFlightControllerCallback() {
-        if (isFlightControllerAvailable()) {
-            FlightController fc = mAircraft.getFlightController();
+        if (!isFlightControllerAvailable()) return;
 
-            if (fc != null) {
-                new Thread() {
-                    @Override
-                    public void run() {
-                        fc.setStateCallback(new FlightControllerState.Callback() {
-                            @Override
-                            public void onUpdate(@NonNull FlightControllerState flightControllerState) {
-                                Aircraft product = (Aircraft) DJISDKManager.getInstance().getProduct();
+        FlightController fc = mAircraft.getFlightController();
+        fc.setStateCallback(flightControllerState -> {
+//            mTextConnectionStatus.setText(getString(R.string.flight_mode_format, flightControllerState.getFlightModeString()));
 
-                                mTextConnectionStatus.setText("Flight mode: " + flightControllerState.getFlightModeString());
-                                mBtnToggleControl.setEnabled(product.getFlightController().isVirtualStickControlModeAvailable());
+            if (!isMqttConnected()) return;
 
-                                if (isMqttConnected()) {
-                                    // publish status topic
-                                    mMqttClient.publish(TOPIC_STATUS_ALTITUDE, Float.toString(flightControllerState.getAircraftLocation().getAltitude()), MqttQos.EXACTLY_ONCE);
-                                    mMqttClient.publish(TOPIC_STATUS_VERTICAL_SPEED, Float.toString(flightControllerState.getVelocityZ()), MqttQos.EXACTLY_ONCE);
+            // publish status topic
+            mMqttClient.publish(TOPIC_STATUS_ALTITUDE, String.valueOf(flightControllerState.getAircraftLocation().getAltitude()), MqttQos.EXACTLY_ONCE);
+            mMqttClient.publish(TOPIC_STATUS_VERTICAL_SPEED, String.valueOf(flightControllerState.getVelocityZ()), MqttQos.EXACTLY_ONCE);
 
-                                    List<Float> horSpeed = Arrays.asList(flightControllerState.getVelocityX(), flightControllerState.getVelocityY());
-                                    mMqttClient.publish(TOPIC_STATUS_HORIZONTAL_SPEED, horSpeed.toString(), MqttQos.EXACTLY_ONCE);
+            List<Float> horSpeed = Arrays.asList(flightControllerState.getVelocityX(), flightControllerState.getVelocityY());
+            mMqttClient.publish(TOPIC_STATUS_HORIZONTAL_SPEED, horSpeed.toString(), MqttQos.EXACTLY_ONCE);
 
-                                    // publish flight mode
-                                    mMqttClient.publish(TOPIC_STATUS_FLIGHT_MODE, flightControllerState.getFlightModeString());
-                                }
-                            }
-                        });
-                    }
-                }.start();
-            }
-        }
+            // publish flight mode
+            mMqttClient.publish(TOPIC_STATUS_FLIGHT_MODE, flightControllerState.getFlightModeString());
+        });
     }
 
     private void setBatteryCallback () {
-        if (isAircraftConnected()) {
-            new Thread() {
-                public void run() {
-                    mAircraft.getBattery().setStateCallback(new BatteryState.Callback() {
-                        @Override
-                        public void onUpdate(BatteryState batteryState) {
-                            if (isMqttConnected()) {
-                                mMqttClient.publish(TOPIC_STATUS_BATTERY, Integer.toString(batteryState.getChargeRemainingInPercent()));
-                            }
-                        }
-                    });
-                }
-            }.start();
-        }
+        if (!isAircraftConnected()) return;
+
+        mAircraft.getBattery().setStateCallback(batteryState -> {
+            if (!isMqttConnected()) return;
+
+            mMqttClient.publish(TOPIC_STATUS_BATTERY, Integer.toString(batteryState.getChargeRemainingInPercent()));
+        });
     }
 
     private void setObstacleCallback() {
-        if (isFlightControllerAvailable()) {
-            FlightAssistant intelligentFlightAssistant = mAircraft.getFlightController().getFlightAssistant();
+        if (!isFlightControllerAvailable()) return;
 
-            if (intelligentFlightAssistant != null) {
-                new Thread() {
-                    @Override
-                    public void run() {
-                        intelligentFlightAssistant.setVisionDetectionStateUpdatedCallback(new VisionDetectionState.Callback() {
-                            @Override
-                            public void onUpdate(@NonNull VisionDetectionState visionDetectionState) {
-                                ObstacleDetectionSector[] visionDetectionSectorArray =
-                                        visionDetectionState.getDetectionSectors();
+        FlightAssistant intelligentFlightAssistant = mAircraft.getFlightController().getFlightAssistant();
 
-                                List<Float> obstacleDistances = new ArrayList<Float>();
-                                List<String> obstacleWarnings = new ArrayList<String>();
+        if (intelligentFlightAssistant == null) return;
 
-                                // FOR WARNING LEVEL, REFER TO https://developer.dji.com/api-reference/android-api/Components/VisionDetectionState/DJIVisionDetectionState_DJIVisionDetectionSector.html#djivisiondetectionstate_visionsectorwarning_inline
-                                for (ObstacleDetectionSector visionDetectionSector : visionDetectionSectorArray) {
-                                    obstacleDistances.add(visionDetectionSector.getObstacleDistanceInMeters());
+        intelligentFlightAssistant.setVisionDetectionStateUpdatedCallback(visionDetectionState -> {
+            ObstacleDetectionSector[] visionDetectionSectorArray =
+                    visionDetectionState.getDetectionSectors();
 
-                                    switch (visionDetectionSector.getWarningLevel()){
-                                        case INVALID:
-                                            obstacleWarnings.add("INVALID");
-                                            break;
-                                        case LEVEL_1:
-                                            obstacleWarnings.add("LEVEL_1");
-                                            break;
-                                        case LEVEL_2:
-                                            obstacleWarnings.add("LEVEL_2");
-                                            break;
-                                        case LEVEL_3:
-                                            obstacleWarnings.add("LEVEL_3");
-                                            break;
-                                        case LEVEL_4:
-                                            obstacleWarnings.add("LEVEL_4");
-                                            break;
-                                        case LEVEL_5:
-                                            obstacleWarnings.add("LEVEL_5");
-                                            break;
-                                        case LEVEL_6:
-                                            obstacleWarnings.add("LEVEL_6");
-                                            break;
-                                        case UNKNOWN:
-                                            obstacleWarnings.add("UNKNOWN");
-                                            break;
-                                    }
-                                }
+            List<Float> obstacleDistances = new ArrayList<Float>();
+            List<String> obstacleWarnings = new ArrayList<String>();
 
-                                mMqttClient.publish(TOPIC_OBSTACLE_DISTANCE, obstacleDistances.toString());
-                                mMqttClient.publish(TOPIC_OBSTACLE_WARNING, obstacleWarnings.toString());
-                            }
-                        });
-                    }
-                }.start();
+            // FOR WARNING LEVEL, REFER TO https://developer.dji.com/api-reference/android-api/Components/VisionDetectionState/DJIVisionDetectionState_DJIVisionDetectionSector.html#djivisiondetectionstate_visionsectorwarning_inline
+            for (ObstacleDetectionSector visionDetectionSector : visionDetectionSectorArray) {
+                obstacleDistances.add(visionDetectionSector.getObstacleDistanceInMeters());
+
+                switch (visionDetectionSector.getWarningLevel()){
+                    case INVALID:
+                        obstacleWarnings.add("INVALID");
+                        break;
+                    case LEVEL_1:
+                        obstacleWarnings.add("LEVEL_1");
+                        break;
+                    case LEVEL_2:
+                        obstacleWarnings.add("LEVEL_2");
+                        break;
+                    case LEVEL_3:
+                        obstacleWarnings.add("LEVEL_3");
+                        break;
+                    case LEVEL_4:
+                        obstacleWarnings.add("LEVEL_4");
+                        break;
+                    case LEVEL_5:
+                        obstacleWarnings.add("LEVEL_5");
+                        break;
+                    case LEVEL_6:
+                        obstacleWarnings.add("LEVEL_6");
+                        break;
+                    case UNKNOWN:
+                        obstacleWarnings.add("UNKNOWN");
+                        break;
+                }
             }
-        }
+
+            if (!isMqttConnected()) return;
+
+            mMqttClient.publish(TOPIC_OBSTACLE_DISTANCE, obstacleDistances.toString());
+            mMqttClient.publish(TOPIC_OBSTACLE_WARNING, obstacleWarnings.toString());
+        });
     }
 
     private void publishStatusConnection(boolean state) {
-        if (isMqttConnected()) {
-            mMqttClient.publish(TOPIC_STATUS_CONNECTION, state ? "true":"false");
-        }
+        if (!isMqttConnected()) return;
+
+        mMqttClient.publish(TOPIC_STATUS_CONNECTION, String.valueOf(state));
     }
 
     private void publishModelName() {
-        if (isMqttConnected() && isAircraftConnected()) {
-            mMqttClient.publish(TOPIC_MODEL_NAME, mAircraft.getModel().getDisplayName());
-        }
+        if (!isMqttConnected() || !isAircraftConnected()) return;
+
+        mMqttClient.publish(TOPIC_MODEL_NAME, mAircraft.getModel().getDisplayName());
     }
 
     private synchronized void startLivestream(Context context) {
         showToast("Starting livestream to " + mRtmpServerURI);
-        if (!isLiveStreamManagerOn()) {
-            return;
-        }
+        if (!isLiveStreamManagerOn()) return;
+
         if (isLivestreaming()) {
             Log.d("LIVESTREAM STARTED", mRtmpServerURI);
             return;
@@ -731,16 +713,15 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private synchronized void stopLivestream() {
-        if (!isLiveStreamManagerOn()) {
-            return;
-        }
+        if (!isLiveStreamManagerOn()) return;
+
         showToast("Stopping Livestream");
         DJISDKManager.getInstance().getLiveStreamManager().stopStream();
         showToast("LIVESTREAM STOPPED");
     }
 
     private synchronized void startFlightControl() {
-        if (isVirtualStickControlModeAvailable()) {
+        if (mIsVirtualStickControlModeEnabled.get()) {
             showToast("Starting flight control");
 
             // set control mode
@@ -776,17 +757,16 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 });
             });
         } else {
-            showToast("Virtual stick control mode not available");
+            showToast("Virtual stick control mode disable");
+            setVirtualStickControlModeEnabled(true);
         }
     }
 
     private synchronized void stopFlightControl() {
-        if (isVirtualStickControlModeAvailable()) {
-            showToast("Stopping flight control");
-            setVirtualStickControlModeEnabled(false);
+        showToast("Stopping flight control");
+        setVirtualStickControlModeEnabled(false);
 
-            mMqttClient.unsubscribe(TOPIC_CONTROL);
-        }
+        mMqttClient.unsubscribe(TOPIC_CONTROL);
     }
 
     @Override
@@ -810,7 +790,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onDestroy() {
         Log.e(TAG, "onDestroy");
-//        unregisterReceiver(mReceiver);
+        unregisterReceiver(mReceiver);
         super.onDestroy();
 
         if (isLivestreaming()) stopLivestream();
