@@ -23,6 +23,8 @@ import android.widget.Toast;
 
 import com.cadit.djicamera.controller.CustomMqttClient;
 import com.cadit.djicamera.controller.CustomTextWatcher;
+import com.cadit.djicamera.utilities.ToastUtils;
+import com.cadit.djicamera.utilities.VideoFeedView;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 
 import java.nio.charset.StandardCharsets;
@@ -48,6 +50,7 @@ import dji.common.util.CommonCallbacks;
 import dji.log.DJILog;
 import dji.sdk.base.BaseComponent;
 import dji.sdk.base.BaseProduct;
+import dji.sdk.camera.VideoFeeder;
 import dji.sdk.flightcontroller.FlightAssistant;
 import dji.sdk.flightcontroller.FlightController;
 import dji.sdk.products.Aircraft;
@@ -82,6 +85,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private LiveStreamManager.OnLiveChangeListener mListener;
     private AtomicBoolean mIsVirtualStickControlModeEnabled = new AtomicBoolean(false);
 
+
     private String mRtmpServerURI = "";
     private String mMqttBrokerURI = "";
     private String mMqttUsername = "";
@@ -92,6 +96,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private Boolean mIsRtmpURIValid = false;
     private Boolean mIsMqttURIValid = false;
 
+    private VideoFeedView mPrimaryVideoFeedView;
     private TextView mTextProduct;
     private TextView mTextConnectionStatus;
     private TextView mTextFirmwareVersion;
@@ -261,6 +266,9 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     private void initUI(Context context) {
         mRtmpServerURI = context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).getString(URL_KEY, mRtmpServerURI);
+
+        mPrimaryVideoFeedView = (VideoFeedView) findViewById(R.id.video_feed_primary);
+
         mTextProduct = (TextView) findViewById(R.id.text_product_name);
         mTextConnectionStatus = (TextView) findViewById(R.id.text_product_status);
         mTextFirmwareVersion = (TextView) findViewById(R.id.text_firmware_version);
@@ -296,7 +304,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void validate(TextView textView, String text) {
                 mRtmpServerURI = text;
-                mIsRtmpURIValid = rtmpRegexp.matcher(text).matches();
+//                mIsRtmpURIValid = rtmpRegexp.matcher(text).matches();
+                mIsRtmpURIValid = true;
                 setConnectButtonEnabled();
             }
         });
@@ -450,12 +459,14 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 mBtnToggleLivestream.setVisibility(View.VISIBLE);
                 mBtnToggleControl.setVisibility(View.VISIBLE);
                 mBtnCheckStatus.setVisibility(View.VISIBLE);
+                mPrimaryVideoFeedView.setVisibility(View.VISIBLE);
             } else {
                 mBtnToggleConnect.setText(R.string.button_connect);
 
                 mBtnToggleLivestream.setVisibility(View.GONE);
                 mBtnToggleControl.setVisibility(View.GONE);
                 mBtnCheckStatus.setVisibility(View.GONE);
+                mPrimaryVideoFeedView.setVisibility(View.GONE);
             }
         } else {
             Log.v(TAG, "refreshSDK: False");
@@ -475,6 +486,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             mBtnToggleControl.setVisibility(View.GONE);
 
             mBtnCheckStatus.setVisibility(View.GONE);
+            mPrimaryVideoFeedView.setVisibility(View.GONE);
         }
     }
 
@@ -512,6 +524,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         showToast("Failed to connect to MQTT broker");
                     } else {
                         registerLivestreamListener();
+                        registerLiveVideoFeed();
                         setFlightControllerCallback();
                         setObstacleCallback();
                         setBatteryCallback();
@@ -556,6 +569,9 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 "isVirtualStickControlModeAvailable: " + String.valueOf(isVirtualStickControlModeAvailable()));
                 break;
             }
+
+            default:
+                break;
         }
     }
 
@@ -569,6 +585,12 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         if (!isLiveStreamManagerOn()) return;
 
         DJISDKManager.getInstance().getLiveStreamManager().unregisterListener(mListener);
+    }
+
+    private void registerLiveVideoFeed() {
+        if (VideoFeeder.getInstance() == null) return;
+
+        mPrimaryVideoFeedView.registerLiveVideo(VideoFeeder.getInstance().getPrimaryVideoFeed(), true);
     }
 
     private void setVirtualStickControlModeEnabled(boolean enabled) {
@@ -688,31 +710,34 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         mMqttClient.publish(TOPIC_MODEL_NAME, mAircraft.getModel().getDisplayName());
     }
 
-    private synchronized void startLivestream(Context context) {
+    void startLivestream(Context context) {
         showToast("Starting livestream to " + mRtmpServerURI);
+
         if (!isLiveStreamManagerOn()) return;
 
         if (isLivestreaming()) {
             Log.d("LIVESTREAM STARTED", mRtmpServerURI);
             return;
         }
+
         new Thread() {
             @Override
-            public void run() {
+            public void run () {
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveUrl(mRtmpServerURI);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveVideoResolution(LiveVideoResolution.VIDEO_RESOLUTION_960_720);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveVideoBitRateMode(LiveVideoBitRateMode.AUTO);
-                DJISDKManager.getInstance().getLiveStreamManager().setAudioStreamingEnabled(false);
                 int result = DJISDKManager.getInstance().getLiveStreamManager().startStream();
-                context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).edit().putString(URL_KEY, mRtmpServerURI).commit();
-                Log.d("START LIVESTREAM", "startLive:" + result +
-                        "\n isVideoStreamSpeedConfigurable:" + DJISDKManager.getInstance().getLiveStreamManager().isVideoStreamSpeedConfigurable() +
-                        "\n isLiveAudioEnabled:" + DJISDKManager.getInstance().getLiveStreamManager().isLiveAudioEnabled());
+                DJISDKManager.getInstance().getLiveStreamManager().setStartTime();
+                HomeActivity.this.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).edit().putString(URL_KEY, mRtmpServerURI).commit();
+
+                ToastUtils.setResultToToast("startLive: " + result +
+                        "\n isVideoStreamSpeedConfigurable: " + DJISDKManager.getInstance().getLiveStreamManager().isVideoStreamSpeedConfigurable() +
+                        "\n isLiveAudioEnabled: " + DJISDKManager.getInstance().getLiveStreamManager().isLiveAudioEnabled());
             }
         }.start();
     }
 
-    private synchronized void stopLivestream() {
+    private void stopLivestream() {
         if (!isLiveStreamManagerOn()) return;
 
         showToast("Stopping Livestream");
@@ -720,7 +745,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         showToast("LIVESTREAM STOPPED");
     }
 
-    private synchronized void startFlightControl() {
+    private void startFlightControl() {
         if (mIsVirtualStickControlModeEnabled.get()) {
             showToast("Starting flight control");
 
@@ -762,7 +787,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    private synchronized void stopFlightControl() {
+    private void stopFlightControl() {
         showToast("Stopping flight control");
         setVirtualStickControlModeEnabled(false);
 
@@ -791,12 +816,12 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     protected void onDestroy() {
         Log.e(TAG, "onDestroy");
         unregisterReceiver(mReceiver);
-        super.onDestroy();
 
         if (isLivestreaming()) stopLivestream();
         if (mIsVirtualStickControlModeEnabled.get()) stopFlightControl();
-
         if (isMqttConnected()) mMqttClient.disconnect();
+
+        super.onDestroy();
     }
 
     public void onReturn(View view){
