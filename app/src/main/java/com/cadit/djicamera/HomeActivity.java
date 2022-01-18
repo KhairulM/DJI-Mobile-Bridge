@@ -282,7 +282,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         mEditMQTTUsername = (EditText) findViewById(R.id.edit_text_mqtt_username);
 
         mBtnToggleConnect = (Button) findViewById(R.id.button_connect_disconnect);
-//        TODO: UNCOMMENT THIS LINE BEFORE TESTING WITH DJI DRONE
         mBtnToggleConnect.setEnabled(false);
         mBtnToggleConnect.setOnClickListener(this);
 
@@ -304,9 +303,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void validate(TextView textView, String text) {
                 mRtmpServerURI = text;
+//                TODO: change RTMP regexp
 //                mIsRtmpURIValid = rtmpRegexp.matcher(text).matches();
                 mIsRtmpURIValid = true;
-                setConnectButtonEnabled();
+
+                refreshSDKRelativeUI();
             }
         });
 
@@ -320,7 +321,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 if (split.length > 1) mMqttPort = Integer.valueOf(split[1]);
                 else mMqttPort = DEFAULT_MQTT_PORT;
 
-                setConnectButtonEnabled();
+                refreshSDKRelativeUI();
             }
         });
 
@@ -347,25 +348,10 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void setConnectButtonEnabled() {
-        if (isAircraftConnected() &&
-            mIsRtmpURIValid &&
-            mIsMqttURIValid)
-        {
-            mBtnToggleConnect.setEnabled(true);
-        } else {
-//            mBtnToggleConnect.setEnabled(true);
-//            TODO: UNCOMMENT THIS LINE BEFORE TESTING WITH DJI DRONE
-            mBtnToggleConnect.setEnabled(false);
-        }
-    }
-
-    private void showToast(final String toastMsg) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                Toast.makeText(getApplicationContext(), toastMsg, Toast.LENGTH_LONG).show();
-            }
-        });
+        mBtnToggleConnect.setEnabled(
+                isAircraftConnected() &&
+                mIsRtmpURIValid &&
+                mIsMqttURIValid);
     }
 
     private boolean isLiveStreamManagerOn() {
@@ -427,6 +413,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 gracefullyDisconnect();
 
                 mAircraft = null;
+
+                refreshSDKRelativeUI();
             } catch (Exception e) {
                 showToast(e.toString());
                 Log.e(TAG, e.toString());
@@ -435,14 +423,13 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void refreshSDKRelativeUI() {
-//        TODO: REMOVE "!" FROM THIS LINE BEFORE TESTING WITH DJI DRONE
         if (isAircraftConnected()) {
             Log.v(TAG, "refreshSDK: True");
 
             setConnectButtonEnabled();
             mTextConnectionStatus.setText("Status: DJIAircraft connected");
             mTextConnectionStatus.setVisibility(View.VISIBLE);
-//            TODO: UNCOMMENT THIS LINES BEFORE TESTING WITH DJI DRONE
+
             if (mAircraft.getFirmwarePackageVersion() != null) {
                 mTextFirmwareVersion.setText("Firmware version: " + mAircraft.getFirmwarePackageVersion());
             }
@@ -508,8 +495,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         if (mIsVirtualStickControlModeEnabled.get()) {
             stopFlightControl();
         }
-
-        refreshSDKRelativeUI();
     }
 
     @Override
@@ -517,6 +502,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         switch (v.getId()) {
             case R.id.button_connect_disconnect: {
                 if (mBtnToggleConnect.getText().toString() == getResources().getString(R.string.button_connect)) {
+                    Log.d(TAG, "onClickConnect");
+
                     if (mMqttClient != null) mMqttClient.disconnect();
 
                     mMqttClient = new CustomMqttClient(TAG, mMqttBrokerURI, mMqttPort);
@@ -534,16 +521,24 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         refreshSDKRelativeUI();
                     }
                 } else {
+                    Log.d(TAG, "onClickDisconnect");
+
                     gracefullyDisconnect();
+
+                    refreshSDKRelativeUI();
                 }
                 break;
             }
 
             case R.id.button_start_livestream: {
                 if (mBtnToggleLivestream.getText().toString() == getResources().getString(R.string.button_start_livestream)) {
+                    Log.d(TAG, "onClickStartLivestream");
+
                     startLivestream(this);
                     mBtnToggleLivestream.setText(R.string.button_stop_livestream);
                 } else {
+                    Log.d(TAG, "onClickStopLivestream");
+
                     stopLivestream();
                     mBtnToggleLivestream.setText(R.string.button_start_livestream);
                 }
@@ -552,9 +547,13 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
             case R.id.button_start_control: {
                 if (mBtnToggleControl.getText().toString() == getResources().getString(R.string.button_start_control)) {
+                    Log.d(TAG, "onClickStartFlightControl");
+
                     startFlightControl();
                     mBtnToggleControl.setText(R.string.button_stop_control);
                 } else {
+                    Log.d(TAG, "onClickStopFlightControl");
+
                     stopFlightControl();
                     mBtnToggleControl.setText(R.string.button_start_control);
                 }
@@ -566,7 +565,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 "isLivestreaming: " + String.valueOf(isLivestreaming()) + "\n" +
                 "isMqttConnected: " + String.valueOf(isMqttConnected()) + "\n" +
                 "isFlightControllerAvailable: " + String.valueOf(isFlightControllerAvailable()) + "\n" +
-                "isVirtualStickControlModeAvailable: " + String.valueOf(isVirtualStickControlModeAvailable()));
+                "isVirtualStickControlModeAvailable: " + String.valueOf(isVirtualStickControlModeAvailable()) + "\n" +
+                "isVirtualStickControlEnabled: " + String.valueOf(mIsVirtualStickControlModeEnabled.get()));
                 break;
             }
 
@@ -723,14 +723,15 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         new Thread() {
             @Override
             public void run () {
+                DJISDKManager.getInstance().getLiveStreamManager().setVideoSource(LiveStreamManager.LiveStreamVideoSource.Primary);
+                DJISDKManager.getInstance().getLiveStreamManager().setAudioStreamingEnabled(false);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveUrl(mRtmpServerURI);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveVideoResolution(LiveVideoResolution.VIDEO_RESOLUTION_960_720);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveVideoBitRateMode(LiveVideoBitRateMode.AUTO);
                 int result = DJISDKManager.getInstance().getLiveStreamManager().startStream();
                 DJISDKManager.getInstance().getLiveStreamManager().setStartTime();
-                HomeActivity.this.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).edit().putString(URL_KEY, mRtmpServerURI).commit();
-
-                ToastUtils.setResultToToast("startLive: " + result +
+                context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).edit().putString(URL_KEY, mRtmpServerURI).commit();
+                showToast(DJISDKManager.getInstance().getLiveStreamManager().getLiveUrl() + ": " + result +
                         "\n isVideoStreamSpeedConfigurable: " + DJISDKManager.getInstance().getLiveStreamManager().isVideoStreamSpeedConfigurable() +
                         "\n isLiveAudioEnabled: " + DJISDKManager.getInstance().getLiveStreamManager().isLiveAudioEnabled());
             }
@@ -827,5 +828,14 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     public void onReturn(View view){
         Log.e(TAG, "onReturn");
         this.finish();
+    }
+
+    private void showToast(final String toastMsg) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(getApplicationContext(), toastMsg, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 }
