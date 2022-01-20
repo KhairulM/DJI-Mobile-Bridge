@@ -517,6 +517,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         setBatteryCallback();
                         publishModelName();
                         publishStatusConnection(true);
+                        setVirtualStickControlModeEnabled(true);
 
                         refreshSDKRelativeUI();
                     }
@@ -594,20 +595,20 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void setVirtualStickControlModeEnabled(boolean enabled) {
-        if (!isVirtualStickControlModeAvailable()) return;
+        if (mIsVirtualStickControlModeEnabled.get() == enabled) return;
 
         mAircraft.getFlightController().setFlightOrientationMode(FlightOrientationMode.AIRCRAFT_HEADING, djiError -> {
             if (djiError != null) {
-                DJILog.e("Flight orientation mode", djiError.getDescription());
-                showToast("Failed to set flight orientation mode");
+                DJILog.e("Flight orientation mode: ", djiError.getDescription());
+                showToast("Failed to set flight orientation mode: " + djiError.getDescription());
             }
         });
 
         // enabling virtual stick control mode
         mAircraft.getFlightController().setVirtualStickModeEnabled(enabled, djiError -> {
             if (djiError != null) {
-                DJILog.e("Virtual stick enable", djiError.getDescription());
-                showToast("Failed to set virtual stick control mode");
+                DJILog.e("Virtual stick enable: ", djiError.getDescription());
+                showToast("Failed to set virtual stick control mode: " + djiError.getDescription());
             } else {
                 mIsVirtualStickControlModeEnabled.compareAndSet(!enabled, enabled);
             }
@@ -619,8 +620,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
         FlightController fc = mAircraft.getFlightController();
         fc.setStateCallback(flightControllerState -> {
-//            mTextConnectionStatus.setText(getString(R.string.flight_mode_format, flightControllerState.getFlightModeString()));
-
             if (!isMqttConnected()) return;
 
             // publish status topic
@@ -725,15 +724,16 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             public void run () {
                 DJISDKManager.getInstance().getLiveStreamManager().setVideoSource(LiveStreamManager.LiveStreamVideoSource.Primary);
                 DJISDKManager.getInstance().getLiveStreamManager().setAudioStreamingEnabled(false);
+                DJISDKManager.getInstance().getLiveStreamManager().setVideoEncodingEnabled(false);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveUrl(mRtmpServerURI);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveVideoResolution(LiveVideoResolution.VIDEO_RESOLUTION_960_720);
                 DJISDKManager.getInstance().getLiveStreamManager().setLiveVideoBitRateMode(LiveVideoBitRateMode.AUTO);
                 int result = DJISDKManager.getInstance().getLiveStreamManager().startStream();
                 DJISDKManager.getInstance().getLiveStreamManager().setStartTime();
                 context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).edit().putString(URL_KEY, mRtmpServerURI).commit();
-                showToast(DJISDKManager.getInstance().getLiveStreamManager().getLiveUrl() + ": " + result +
-                        "\n isVideoStreamSpeedConfigurable: " + DJISDKManager.getInstance().getLiveStreamManager().isVideoStreamSpeedConfigurable() +
-                        "\n isLiveAudioEnabled: " + DJISDKManager.getInstance().getLiveStreamManager().isLiveAudioEnabled());
+                showToast(DJISDKManager.getInstance().getLiveStreamManager().getLiveUrl() + ": " + result + "\n" +
+                        "isVideoStreamSpeedConfigurable: " + DJISDKManager.getInstance().getLiveStreamManager().isVideoStreamSpeedConfigurable() + "\n" +
+                        "isLiveAudioEnabled: " + DJISDKManager.getInstance().getLiveStreamManager().isLiveAudioEnabled());
             }
         }.start();
     }
@@ -741,56 +741,51 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private void stopLivestream() {
         if (!isLiveStreamManagerOn()) return;
 
-        showToast("Stopping Livestream");
+        showToast("Stopping livestream");
         DJISDKManager.getInstance().getLiveStreamManager().stopStream();
-        showToast("LIVESTREAM STOPPED");
+
+        Log.d(TAG, "LIVESTREAM STOPPED");
     }
 
     private void startFlightControl() {
-        if (mIsVirtualStickControlModeEnabled.get()) {
-            showToast("Starting flight control");
+        showToast("Starting flight control");
 
-            // set control mode
-            FlightController fc = mAircraft.getFlightController();
-            fc.setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
-            fc.setRollPitchControlMode(RollPitchControlMode.VELOCITY);
-            fc.setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
-            fc.setVerticalControlMode(VerticalControlMode.POSITION);
+        // set control mode
+        FlightController fc = mAircraft.getFlightController();
+        fc.setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
+        fc.setRollPitchControlMode(RollPitchControlMode.VELOCITY);
+        fc.setYawControlMode(YawControlMode.ANGULAR_VELOCITY);
+        fc.setVerticalControlMode(VerticalControlMode.POSITION);
 
-            mMqttClient.subscribe(TOPIC_CONTROL, (message) -> {
-                final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
+        mMqttClient.subscribe(TOPIC_CONTROL, (message) -> {
+            final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
 
-                Log.v(TAG, "Control received: " + payload);
+            showToast("Control received: " + payload);
+            Log.v(TAG, "Control received: " + payload);
 
-                String[] strControls = payload.substring(1, payload.length()-1).split(",");
+            String[] strControls = payload.substring(1, payload.length()-1).split(",");
 
-                FlightControlData newControl = new FlightControlData(
-                        Float.parseFloat(strControls[0]),
-                        Float.parseFloat(strControls[1]),
-                        Float.parseFloat(strControls[2]),
-                        Float.parseFloat(strControls[3])
-                );
+            FlightControlData newControl = new FlightControlData(
+                    Float.parseFloat(strControls[0]),
+                    Float.parseFloat(strControls[1]),
+                    Float.parseFloat(strControls[2]),
+                    Float.parseFloat(strControls[3])
+            );
 
-                mAircraft.getFlightController().sendVirtualStickFlightControlData(newControl, new CommonCallbacks.CompletionCallback() {
-                    @Override
-                    public void onResult(DJIError djiError) {
-                        if (djiError != null) {
-                            Log.e(TAG, "Failed to send virtual stick control data");
-                        } else {
-                            Log.v(TAG, "Control sent: " + payload);
-                        }
-                    }
-                });
+            mAircraft.getFlightController().sendVirtualStickFlightControlData(newControl, djiError -> {
+                if (djiError != null) {
+                    showToast("Failed to send virtual stick control data: " + djiError.getDescription());
+                    Log.d(TAG, "Failed to send virtual stick control data: " + djiError.getDescription());
+                } else {
+                    showToast("Control sent: " + payload);
+                    Log.d(TAG, "Control sent: " + payload);
+                }
             });
-        } else {
-            showToast("Virtual stick control mode disable");
-            setVirtualStickControlModeEnabled(true);
-        }
+        });
     }
 
     private void stopFlightControl() {
         showToast("Stopping flight control");
-        setVirtualStickControlModeEnabled(false);
 
         mMqttClient.unsubscribe(TOPIC_CONTROL);
     }
@@ -817,9 +812,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     protected void onDestroy() {
         Log.e(TAG, "onDestroy");
         unregisterReceiver(mReceiver);
+        gracefullyDisconnect();
 
-        if (isLivestreaming()) stopLivestream();
-        if (mIsVirtualStickControlModeEnabled.get()) stopFlightControl();
         if (isMqttConnected()) mMqttClient.disconnect();
 
         super.onDestroy();
