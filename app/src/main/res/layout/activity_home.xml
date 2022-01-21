@@ -59,6 +59,7 @@
             android:padding="12dp"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
+            android:text="@string/rtmp_server_preinput"
             android:textColor="@color/black"
             android:textColorHighlight="@color/purple_500"
             android:textColorLink="@color/colorPrimary"
