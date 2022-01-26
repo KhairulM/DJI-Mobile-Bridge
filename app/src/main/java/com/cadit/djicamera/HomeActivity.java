@@ -53,6 +53,7 @@ import dji.sdk.base.BaseProduct;
 import dji.sdk.camera.VideoFeeder;
 import dji.sdk.flightcontroller.FlightAssistant;
 import dji.sdk.flightcontroller.FlightController;
+import dji.sdk.payload.Payload;
 import dji.sdk.products.Aircraft;
 import dji.sdk.products.HandHeld;
 import dji.sdk.sdkmanager.DJISDKInitEvent;
@@ -78,12 +79,15 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private static final String TOPIC_STATUS_ALTITUDE = "dji/status/altitude";
     private static final String TOPIC_STATUS_VERTICAL_SPEED = "dji/status/vertical-speed";
     private static final String TOPIC_STATUS_HORIZONTAL_SPEED = "dji/status/horizontal-speed";
+    private static final String TOPIC_CONTROL_TAKEOFF = "dji/control/takeoff";
+    private static final String TOPIC_CONTROL_RTH = "dji/control/rth";
 
     private CustomMqttClient mMqttClient = null;
 
     private Aircraft mAircraft = null;
     private LiveStreamManager.OnLiveChangeListener mListener;
     private AtomicBoolean mIsVirtualStickControlModeEnabled = new AtomicBoolean(false);
+    private AtomicBoolean mIsTakeoffWithoutGPSEnabled = new AtomicBoolean(false);
 
 
     private String mRtmpServerURI = "";
@@ -517,12 +521,13 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
                     registerLivestreamListener();
                     registerLiveVideoFeed();
+//                    enableTakeoffWithoutGPS();
+                    setVirtualStickControlModeEnabled(true);
                     setFlightControllerCallback();
                     setObstacleCallback();
                     setBatteryCallback();
                     publishModelName();
                     publishStatusConnection(true);
-                    setVirtualStickControlModeEnabled(true);
 
                     refreshSDKRelativeUI();
                 } else {
@@ -571,7 +576,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 "Is MQTT broker connected: " + String.valueOf(isMqttConnected()) + "\n" +
                 "Is flight controller available: " + String.valueOf(isFlightControllerAvailable()) + "\n" +
                 "Is virtual stick control enabled: " + String.valueOf(mIsVirtualStickControlModeEnabled.get()) + "\n" +
-                "Is virtual stick control available: " + String.valueOf(isVirtualStickControlModeAvailable()));
+                "Is virtual stick control available: " + String.valueOf(isVirtualStickControlModeAvailable()) + "\n" +
+                "Is takeoff without gps enabled: " + String.valueOf(mIsTakeoffWithoutGPSEnabled.get()));
                 break;
             }
 
@@ -597,6 +603,19 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
         mPrimaryVideoFeedView.registerLiveVideo(VideoFeeder.getInstance().getPrimaryVideoFeed(), true);
     }
+
+//    private void enableTakeoffWithoutGPS() {
+//        if (!isFlightControllerAvailable()) return;
+//
+//        mAircraft.getFlightController().lockTakeoffWithoutGPS(false, djiError -> {
+//            if (djiError != null) {
+//                Log.e(TAG, "enableTakeoffWithoutGPS: " + djiError.getDescription());
+//                showToast("Failed to enable takeoff without gps: " + djiError.getDescription());
+//            } else {
+//                mIsTakeoffWithoutGPSEnabled.compareAndSet(false, true);
+//            }
+//        });
+//    }
 
     private void setVirtualStickControlModeEnabled(boolean enabled) {
         if (!isFlightControllerAvailable()) return;
@@ -757,9 +776,45 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                     showToast("Failed to send virtual stick control data: " + djiError.getDescription());
                     Log.e(TAG, "startFlightControl: Failed to send virtual stick control data: " + djiError.getDescription());
                 } else {
-                    Log.d(TAG, "Control sent: " + payload);
+                    Log.d(TAG, "startFlightControl: Control sent: " + payload);
                 }
             });
+        });
+
+        mMqttClient.subscribe(TOPIC_CONTROL_TAKEOFF, (message) -> {
+            final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8).toLowerCase();
+
+            Log.d(TAG, "startFlightControl: Takeoff command received: " + payload);
+            showToast("startFlightControl: Takeoff command received: " + payload);
+
+            if (payload.equals("true")) {
+                mAircraft.getFlightController().startTakeoff(djiError -> {
+                    if (djiError != null) {
+                        Log.e(TAG, "startFlightControl: Failed to start takeoff: " + djiError.getDescription());
+                        showToast("Failed to start takeoff: " + djiError.getDescription());
+                    } else {
+                        Log.d(TAG, "startFlightControl: Takeoff complete");
+                    }
+                });
+            }
+        });
+
+        mMqttClient.subscribe(TOPIC_CONTROL_RTH, (message) -> {
+            final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8).toLowerCase();
+
+            Log.d(TAG, "startFlightControl: RTH command received: " + payload);
+            showToast("startFlightControl: RTH command received: " + payload);
+
+            if (payload.equals("true")) {
+                mAircraft.getFlightController().startGoHome(djiError -> {
+                    if (djiError != null) {
+                        Log.e(TAG, "startFlightControl: Failed to start go home: " + djiError.getDescription());
+                        showToast("Failed to start go home: " + djiError.getDescription());
+                    } else {
+                        Log.d(TAG, "startFlightControl: Starting to go home");
+                    }
+                });
+            }
         });
     }
 
