@@ -520,7 +520,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
                     registerLivestreamListener();
                     registerLiveVideoFeed();
-//                    enableTakeoffWithoutGPS();
                     setFlightControllerCallback();
                     setObstacleCallback();
                     setBatteryCallback();
@@ -601,19 +600,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
         mPrimaryVideoFeedView.registerLiveVideo(VideoFeeder.getInstance().getPrimaryVideoFeed(), true);
     }
-
-//    private void enableTakeoffWithoutGPS() {
-//        if (!isFlightControllerAvailable()) return;
-//
-//        mAircraft.getFlightController().lockTakeoffWithoutGPS(false, djiError -> {
-//            if (djiError != null) {
-//                Log.e(TAG, "enableTakeoffWithoutGPS: " + djiError.getDescription());
-//                showToast("Failed to enable takeoff without gps: " + djiError.getDescription());
-//            } else {
-//                mIsTakeoffWithoutGPSEnabled.compareAndSet(false, true);
-//            }
-//        });
-//    }
 
     private void setVirtualStickControlModeEnabled(boolean enabled) {
         if (!isFlightControllerAvailable()) return;
