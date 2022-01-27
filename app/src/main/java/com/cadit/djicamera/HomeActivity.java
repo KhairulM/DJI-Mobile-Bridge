@@ -82,8 +82,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private Aircraft mAircraft = null;
     private LiveStreamManager.OnLiveChangeListener mListener;
     private AtomicBoolean mIsVirtualStickControlModeEnabled = new AtomicBoolean(false);
-    private AtomicBoolean mIsTakeoffWithoutGPSEnabled = new AtomicBoolean(false);
-
 
     private String mRtmpServerURI = "";
     private String mMqttBrokerURI = "";
@@ -568,8 +566,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 "Is MQTT broker connected: " + String.valueOf(isMqttConnected()) + "\n" +
                 "Is flight controller available: " + String.valueOf(isFlightControllerAvailable()) + "\n" +
                 "Is virtual stick control enabled: " + String.valueOf(mIsVirtualStickControlModeEnabled.get()) + "\n" +
-                "Is virtual stick control available: " + String.valueOf(isVirtualStickControlModeAvailable()) + "\n" +
-                "Is takeoff without gps enabled: " + String.valueOf(mIsTakeoffWithoutGPSEnabled.get()));
+                "Is virtual stick control available: " + String.valueOf(isVirtualStickControlModeAvailable()));
                 break;
             }
 
@@ -614,6 +611,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 showToast("Failed to set virtual stick control mode: " + djiError.getDescription());
             } else {
                 mIsVirtualStickControlModeEnabled.compareAndSet(!enabled, enabled);
+                publishStatusFlightControl(enabled);
             }
         });
     }
@@ -736,7 +734,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         showToast("Starting flight control");
 
         setVirtualStickControlModeEnabled(true);
-        publishStatusFlightControl(true);
 
         // set control mode
         FlightController fc = mAircraft.getFlightController();
@@ -810,7 +807,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         showToast("Stopping flight control");
 
         setVirtualStickControlModeEnabled(false);
-        publishStatusFlightControl(false);
 
         mMqttClient.unsubscribe(TOPIC_CONTROL);
         mMqttClient.unsubscribe(TOPIC_CONTROL_TAKEOFF);
