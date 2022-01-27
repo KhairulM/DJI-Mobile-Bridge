@@ -488,7 +488,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private void gracefullyDisconnect() {
         publishStatusConnection(false);
         unregisterLivestreamListener();
-        setVirtualStickControlModeEnabled(false);
 
         if (isLivestreaming()) {
             stopLivestream();
@@ -522,7 +521,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                     registerLivestreamListener();
                     registerLiveVideoFeed();
 //                    enableTakeoffWithoutGPS();
-                    setVirtualStickControlModeEnabled(true);
                     setFlightControllerCallback();
                     setObstacleCallback();
                     setBatteryCallback();
@@ -750,6 +748,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private void startFlightControl() {
         showToast("Starting flight control");
 
+        setVirtualStickControlModeEnabled(true);
+
         // set control mode
         FlightController fc = mAircraft.getFlightController();
         fc.setRollPitchCoordinateSystem(FlightCoordinateSystem.BODY);
@@ -821,7 +821,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private void stopFlightControl() {
         showToast("Stopping flight control");
 
+        setVirtualStickControlModeEnabled(false);
+
         mMqttClient.unsubscribe(TOPIC_CONTROL);
+        mMqttClient.unsubscribe(TOPIC_CONTROL_TAKEOFF);
+        mMqttClient.unsubscribe(TOPIC_CONTROL_RTH);
     }
 
     @Override
