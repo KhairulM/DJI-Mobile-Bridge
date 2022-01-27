@@ -23,7 +23,6 @@ import android.widget.Toast;
 
 import com.cadit.djicamera.controller.CustomMqttClient;
 import com.cadit.djicamera.controller.CustomTextWatcher;
-import com.cadit.djicamera.utilities.ToastUtils;
 import com.cadit.djicamera.utilities.VideoFeedView;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 
@@ -34,26 +33,21 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-import dji.common.battery.BatteryState;
 import dji.common.error.DJIError;
 import dji.common.error.DJISDKError;
-import dji.common.flightcontroller.FlightControllerState;
 import dji.common.flightcontroller.FlightOrientationMode;
 import dji.common.flightcontroller.ObstacleDetectionSector;
-import dji.common.flightcontroller.VisionDetectionState;
 import dji.common.flightcontroller.virtualstick.FlightControlData;
 import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
 import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
 import dji.common.flightcontroller.virtualstick.VerticalControlMode;
 import dji.common.flightcontroller.virtualstick.YawControlMode;
-import dji.common.util.CommonCallbacks;
 import dji.log.DJILog;
 import dji.sdk.base.BaseComponent;
 import dji.sdk.base.BaseProduct;
 import dji.sdk.camera.VideoFeeder;
 import dji.sdk.flightcontroller.FlightAssistant;
 import dji.sdk.flightcontroller.FlightController;
-import dji.sdk.payload.Payload;
 import dji.sdk.products.Aircraft;
 import dji.sdk.products.HandHeld;
 import dji.sdk.sdkmanager.DJISDKInitEvent;
@@ -74,6 +68,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private static final String TOPIC_CONTROL = "dji/control";
     private static final String TOPIC_MODEL_NAME = "dji/model/name";
     private static final String TOPIC_STATUS_CONNECTION = "dji/status/connection";
+    private static final String TOPIC_STATUS_FLIGHT_CONTROL = "dji/status/flight-control";
     private static final String TOPIC_STATUS_FLIGHT_MODE = "dji/status/flight-mode";
     private static final String TOPIC_STATUS_BATTERY = "dji/status/battery";
     private static final String TOPIC_STATUS_ALTITUDE = "dji/status/altitude";
@@ -685,6 +680,12 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         mMqttClient.publish(TOPIC_STATUS_CONNECTION, String.valueOf(state));
     }
 
+    private void publishStatusFlightControl(boolean state) {
+        if (!isMqttConnected()) return;
+
+        mMqttClient.publish(TOPIC_STATUS_FLIGHT_CONTROL, String.valueOf(state));
+    }
+
     private void publishModelName() {
         if (!isMqttConnected() || !isAircraftConnected()) return;
 
@@ -735,6 +736,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         showToast("Starting flight control");
 
         setVirtualStickControlModeEnabled(true);
+        publishStatusFlightControl(true);
 
         // set control mode
         FlightController fc = mAircraft.getFlightController();
@@ -808,6 +810,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         showToast("Stopping flight control");
 
         setVirtualStickControlModeEnabled(false);
+        publishStatusFlightControl(false);
 
         mMqttClient.unsubscribe(TOPIC_CONTROL);
         mMqttClient.unsubscribe(TOPIC_CONTROL_TAKEOFF);
