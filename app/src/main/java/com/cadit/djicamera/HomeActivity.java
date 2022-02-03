@@ -35,6 +35,7 @@ import java.util.regex.Pattern;
 
 import dji.common.error.DJIError;
 import dji.common.error.DJISDKError;
+import dji.common.flightcontroller.FlightMode;
 import dji.common.flightcontroller.FlightOrientationMode;
 import dji.common.flightcontroller.ObstacleDetectionSector;
 import dji.common.flightcontroller.virtualstick.FlightControlData;
@@ -66,6 +67,12 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private static final String TOPIC_OBSTACLE_DISTANCE = "dji/obstacle/distance";
     private static final String TOPIC_OBSTACLE_WARNING = "dji/obstacle/warning";
     private static final String TOPIC_CONTROL = "dji/control";
+    private static final String TOPIC_CONTROL_TAKEOFF = "dji/control/takeoff";
+    private static final String TOPIC_CONTROL_RTH = "dji/control/rth";
+    private static final String TOPIC_CONTROL_LAND = "dji/control/land";
+    private static final String TOPIC_CONTROL_TAKEOFF_RESULT = "dji/control/takeoff/result";
+    private static final String TOPIC_CONTROL_RTH_RESULT = "dji/control/rth/result";
+    private static final String TOPIC_CONTROL_LAND_RESULT = "dji/control/land/result";
     private static final String TOPIC_MODEL_NAME = "dji/model/name";
     private static final String TOPIC_STATUS_CONNECTION = "dji/status/connection";
     private static final String TOPIC_STATUS_FLIGHT_CONTROL = "dji/status/flight-control";
@@ -74,8 +81,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private static final String TOPIC_STATUS_ALTITUDE = "dji/status/altitude";
     private static final String TOPIC_STATUS_VERTICAL_SPEED = "dji/status/vertical-speed";
     private static final String TOPIC_STATUS_HORIZONTAL_SPEED = "dji/status/horizontal-speed";
-    private static final String TOPIC_CONTROL_TAKEOFF = "dji/control/takeoff";
-    private static final String TOPIC_CONTROL_RTH = "dji/control/rth";
 
     private CustomMqttClient mMqttClient = null;
 
@@ -382,6 +387,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                mAircraft.getFlightController().isVirtualStickControlModeAvailable();
     }
 
+    private boolean isLanding(){
+        return isFlightControllerAvailable() &&
+                mAircraft.getFlightController().getState().getFlightMode() == FlightMode.AUTO_LANDING;
+    }
+
     private void onConnectionChange() {
         if (isAircraftConnected()) return;
 
@@ -616,12 +626,46 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         });
     }
 
+    private void setMotorsState(boolean state) {
+        if (!isFlightControllerAvailable()) return;
+
+        if (state) {
+            mAircraft.getFlightController().turnOnMotors(djiError -> {
+                if (djiError != null) {
+                    Log.e(TAG, "setMotorsState: " + djiError.getDescription());
+                    showToast("Failed to turn on motors: " + djiError.getDescription());
+                }
+            });
+        } else {
+            mAircraft.getFlightController().turnOffMotors(djiError -> {
+                if (djiError != null) {
+                    Log.e(TAG, "setMotorsState: " + djiError.getDescription());
+                    showToast("Failed to turn off motors: " + djiError.getDescription());
+                }
+            });
+        }
+    }
+
     private void setFlightControllerCallback() {
         if (!isFlightControllerAvailable()) return;
 
         FlightController fc = mAircraft.getFlightController();
         fc.setStateCallback(flightControllerState -> {
             if (!isMqttConnected()) return;
+
+            // check if landing confirmation needed
+            if (isLanding() && flightControllerState.isLandingConfirmationNeeded()) {
+                mAircraft.getFlightController().confirmLanding((djiError) -> {
+                    if (djiError != null) {
+                        showToast("Failed to confirm landing: " + djiError.getDescription());
+                        Log.e(TAG, "setFlightControllerCallback: Failed to confirm landing: " + djiError.getDescription());
+                    } else {
+                        Log.d(TAG, "setFlightControllerCallback: Landing completed");
+                        mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "completed", MqttQos.EXACTLY_ONCE);
+                        setMotorsState(false);
+                    }
+                });
+            }
 
             // publish status topic
             mMqttClient.publish(TOPIC_STATUS_ALTITUDE, String.valueOf(flightControllerState.getAircraftLocation().getAltitude()), MqttQos.EXACTLY_ONCE);
@@ -770,14 +814,19 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8).toLowerCase();
 
             Log.d(TAG, "startFlightControl: Takeoff command received: " + payload);
-            showToast("startFlightControl: Takeoff command received: " + payload);
 
             if (payload.equals("true")) {
+                mMqttClient.publish(TOPIC_CONTROL_TAKEOFF_RESULT, "started", MqttQos.EXACTLY_ONCE);
+
                 mAircraft.getFlightController().startTakeoff(djiError -> {
                     if (djiError != null) {
+                        mMqttClient.publish(TOPIC_CONTROL_TAKEOFF_RESULT, "failed", MqttQos.EXACTLY_ONCE);
+
                         Log.e(TAG, "startFlightControl: Failed to start takeoff: " + djiError.getDescription());
                         showToast("Failed to start takeoff: " + djiError.getDescription());
                     } else {
+                        mMqttClient.publish(TOPIC_CONTROL_TAKEOFF_RESULT, "completed", MqttQos.EXACTLY_ONCE);
+
                         Log.d(TAG, "startFlightControl: Takeoff complete");
                     }
                 });
@@ -788,15 +837,41 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8).toLowerCase();
 
             Log.d(TAG, "startFlightControl: RTH command received: " + payload);
-            showToast("startFlightControl: RTH command received: " + payload);
 
             if (payload.equals("true")) {
+                mMqttClient.publish(TOPIC_CONTROL_RTH_RESULT, "started", MqttQos.EXACTLY_ONCE);
+
                 mAircraft.getFlightController().startGoHome(djiError -> {
                     if (djiError != null) {
+                        mMqttClient.publish(TOPIC_CONTROL_RTH_RESULT, "failed", MqttQos.EXACTLY_ONCE);
+
                         Log.e(TAG, "startFlightControl: Failed to start go home: " + djiError.getDescription());
                         showToast("Failed to start go home: " + djiError.getDescription());
                     } else {
+                        mMqttClient.publish(TOPIC_CONTROL_RTH_RESULT, "completed", MqttQos.EXACTLY_ONCE);
+
                         Log.d(TAG, "startFlightControl: Starting to go home");
+                    }
+                });
+            }
+        });
+
+        mMqttClient.subscribe(TOPIC_CONTROL_LAND, (message) -> {
+            final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8).toLowerCase();
+
+            Log.d(TAG, "startFlightControl: Land command received: " + payload);
+
+            if (payload.equals("true")) {
+                mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "started", MqttQos.EXACTLY_ONCE);
+
+                mAircraft.getFlightController().startLanding(djiError -> {
+                    if (djiError != null) {
+                        mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "failed", MqttQos.EXACTLY_ONCE);
+
+                        Log.e(TAG, "startFlightControl: Failed to start landing: " + djiError.getDescription());
+                        showToast("Failed to start landing: " + djiError.getDescription());
+                    } else {
+                        Log.d(TAG, "startFlightControl: Starting to land");
                     }
                 });
             }
