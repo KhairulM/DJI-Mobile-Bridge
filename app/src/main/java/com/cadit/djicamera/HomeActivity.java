@@ -77,6 +77,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private static final String TOPIC_STATUS_CONNECTION = "dji/status/connection";
     private static final String TOPIC_STATUS_FLIGHT_CONTROL = "dji/status/flight-control";
     private static final String TOPIC_STATUS_FLIGHT_MODE = "dji/status/flight-mode";
+    private static final String TOPIC_STATUS_FLIGHT_TIME = "dji/status/flight-time";
     private static final String TOPIC_STATUS_BATTERY = "dji/status/battery";
     private static final String TOPIC_STATUS_ALTITUDE = "dji/status/altitude";
     private static final String TOPIC_STATUS_VERTICAL_SPEED = "dji/status/vertical-speed";
@@ -674,8 +675,9 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             List<Float> horSpeed = Arrays.asList(flightControllerState.getVelocityX(), flightControllerState.getVelocityY());
             mMqttClient.publish(TOPIC_STATUS_HORIZONTAL_SPEED, horSpeed.toString(), MqttQos.EXACTLY_ONCE);
 
-            // publish flight mode
+            // publish flight mode and flight time
             mMqttClient.publish(TOPIC_STATUS_FLIGHT_MODE, flightControllerState.getFlightModeString());
+            mMqttClient.publish(TOPIC_STATUS_FLIGHT_TIME, String.valueOf(flightControllerState.getFlightTimeInSeconds()));
         });
     }
 
