@@ -46,7 +46,7 @@
             app:layout_constraintTop_toBottomOf="@+id/text_product_name" />
 
         <EditText
-            android:id="@+id/edit_text_rtmp_server"
+            android:id="@+id/edit_text_ip_address"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
@@ -54,29 +54,7 @@
             android:layout_marginEnd="16dp"
             android:background="@drawable/primary_text_input"
             android:ems="10"
-            android:hint="@string/rtmp_edit_hint"
-            android:inputType="textPersonName"
-            android:padding="12dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="@string/rtmp_server_preinput"
-            android:textColor="@color/black"
-            android:textColorHighlight="@color/purple_500"
-            android:textColorLink="@color/colorPrimary"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/text_product_status" />
-
-        <EditText
-            android:id="@+id/edit_text_mqtt_broker"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/primary_text_input"
-            android:ems="10"
-            android:hint="@string/mqtt_broker_edit_hint"
+            android:hint="@string/ip_address_edit_hint"
             android:inputType="textPersonName"
             android:padding="12dp"
             android:paddingStart="12dp"
@@ -86,7 +64,7 @@
             android:textColorLink="@color/colorPrimary"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/edit_text_rtmp_server" />
+            app:layout_constraintTop_toBottomOf="@+id/text_product_name" />
 
         <EditText
             android:id="@+id/edit_text_mqtt_username"
@@ -107,7 +85,7 @@
             android:textColorLink="@color/colorPrimary"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/edit_text_mqtt_broker" />
+            app:layout_constraintTop_toBottomOf="@+id/edit_text_ip_address" />
 
         <EditText
             android:id="@+id/edit_text_mqtt_password"

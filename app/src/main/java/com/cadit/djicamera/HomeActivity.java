@@ -62,6 +62,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private static final String TAG = HomeActivity.class.getName();
     private static final String URL_KEY = "sp_stream_url";
     private static final Integer DEFAULT_MQTT_PORT = 1883;
+    private static final Integer DEFAULT_RTMP_PORT = 1935;
 
     // MQTT TOPICS
     private static final String TOPIC_OBSTACLE_DISTANCE = "dji/obstacle/distance";
@@ -104,8 +105,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private TextView mTextConnectionStatus;
     private TextView mTextFirmwareVersion;
     private TextView mTextSDKVersion;
-    private EditText mEditRTMPServerURI;
-    private EditText mEditMQTTBrokerURI;
+    private EditText mEditIpAddress;
     private EditText mEditMQTTUsername;
     private EditText mEditMQTTPassword;
     private Button mBtnToggleConnect;
@@ -280,8 +280,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         mTextSDKVersion = (TextView) findViewById(R.id.text_sdk_version);
         mTextSDKVersion.setText("DJI SDK version: " + DJISDKManager.getInstance().getSDKVersion());
 
-        mEditRTMPServerURI = (EditText) findViewById(R.id.edit_text_rtmp_server);
-        mEditMQTTBrokerURI = (EditText) findViewById(R.id.edit_text_mqtt_broker);
+        mEditIpAddress = (EditText) findViewById(R.id.edit_text_ip_address);
         mEditMQTTPassword = (EditText) findViewById(R.id.edit_text_mqtt_password);
         mEditMQTTUsername = (EditText) findViewById(R.id.edit_text_mqtt_username);
 
@@ -303,26 +302,14 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         Pattern rtmpRegexp = Pattern.compile("^(rtmp:\\/\\/)((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)(\\.(?!$)|:[0-9]+\\/)){4}(live(\\/|$))[a-zA-Z0-9]*?$");
         Pattern mqttRegexp = Pattern.compile("^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)(\\.(?!$)|:[0-9]+$|$)){4}$");
 
-        mEditRTMPServerURI.addTextChangedListener(new CustomTextWatcher(mEditRTMPServerURI) {
+        mEditIpAddress.addTextChangedListener(new CustomTextWatcher(mEditIpAddress) {
             @Override
             public void validate(TextView textView, String text) {
-                mRtmpServerURI = text;
-//                TODO: change RTMP regexp
-                mIsRtmpURIValid = rtmpRegexp.matcher(text).matches();
+                mRtmpServerURI = String.format("rtmp://%s:%d/live/1234", text, DEFAULT_RTMP_PORT);
+                mMqttBrokerURI= String.format("%s:%d", text, DEFAULT_MQTT_PORT);
 
-                refreshSDKRelativeUI();
-            }
-        });
-
-        mEditMQTTBrokerURI.addTextChangedListener(new CustomTextWatcher(mEditMQTTBrokerURI) {
-            @Override
-            public void validate(TextView textView, String text) {
-                mIsMqttURIValid = mqttRegexp.matcher(text).matches();
-
-                String[] split = text.split(":");
-                mMqttBrokerURI = split[0];
-                if (split.length > 1) mMqttPort = Integer.valueOf(split[1]);
-                else mMqttPort = DEFAULT_MQTT_PORT;
+                mIsRtmpURIValid = rtmpRegexp.matcher(mRtmpServerURI).matches();
+                mIsMqttURIValid = mqttRegexp.matcher(mMqttBrokerURI).matches();
 
                 refreshSDKRelativeUI();
             }

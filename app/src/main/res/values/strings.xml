@@ -20,7 +20,7 @@
     <string name="text_cadit_iot_centre">CAD-IT IoT Centre</string>
     <string name="button_check_livestream">Is Livestream On</string>
     <string name="button_show_ifno">Show Livestream Info</string>
-    <string name="mqtt_broker_edit_hint">MQTT Broker IP Address</string>
+    <string name="ip_address_edit_hint">IP Address for MQTT and RTMP</string>
     <string name="mqtt_username_edit_hint">MQTT Username (optional)</string>
     <string name="mqtt_password_edit_hint">MQTT Password (optional)</string>
     <string name="button_start_livestream">START LIVESTREAM</string>
