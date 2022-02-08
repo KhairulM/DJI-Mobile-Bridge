@@ -647,22 +647,22 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         Log.e(TAG, "setFlightControllerCallback: Failed to confirm landing: " + djiError.getDescription());
                     } else {
                         Log.d(TAG, "setFlightControllerCallback: Landing completed");
-                        mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "completed", MqttQos.EXACTLY_ONCE);
+                        mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "completed", MqttQos.EXACTLY_ONCE, false);
                         setMotorsState(false);
                     }
                 });
             }
 
             // publish status topic
-            mMqttClient.publish(TOPIC_STATUS_ALTITUDE, String.valueOf(flightControllerState.getAircraftLocation().getAltitude()), MqttQos.EXACTLY_ONCE);
-            mMqttClient.publish(TOPIC_STATUS_VERTICAL_SPEED, String.valueOf(flightControllerState.getVelocityZ()), MqttQos.EXACTLY_ONCE);
+            mMqttClient.publish(TOPIC_STATUS_ALTITUDE, String.valueOf(flightControllerState.getAircraftLocation().getAltitude()), MqttQos.EXACTLY_ONCE, false);
+            mMqttClient.publish(TOPIC_STATUS_VERTICAL_SPEED, String.valueOf(flightControllerState.getVelocityZ()), MqttQos.EXACTLY_ONCE, false);
 
             List<Float> horSpeed = Arrays.asList(flightControllerState.getVelocityX(), flightControllerState.getVelocityY());
-            mMqttClient.publish(TOPIC_STATUS_HORIZONTAL_SPEED, horSpeed.toString(), MqttQos.EXACTLY_ONCE);
+            mMqttClient.publish(TOPIC_STATUS_HORIZONTAL_SPEED, horSpeed.toString(), MqttQos.EXACTLY_ONCE, false);
 
             // publish flight mode and flight time
-            mMqttClient.publish(TOPIC_STATUS_FLIGHT_MODE, flightControllerState.getFlightModeString());
-            mMqttClient.publish(TOPIC_STATUS_FLIGHT_TIME, String.valueOf(flightControllerState.getFlightTimeInSeconds()));
+            mMqttClient.publish(TOPIC_STATUS_FLIGHT_MODE, flightControllerState.getFlightModeString(), false);
+            mMqttClient.publish(TOPIC_STATUS_FLIGHT_TIME, String.valueOf(flightControllerState.getFlightTimeInSeconds()), false);
         });
     }
 
@@ -672,7 +672,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         mAircraft.getBattery().setStateCallback(batteryState -> {
             if (!isMqttConnected()) return;
 
-            mMqttClient.publish(TOPIC_STATUS_BATTERY, Integer.toString(batteryState.getChargeRemainingInPercent()));
+            mMqttClient.publish(TOPIC_STATUS_BATTERY, Integer.toString(batteryState.getChargeRemainingInPercent()), false);
         });
     }
 
@@ -698,27 +698,27 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
             if (!isMqttConnected()) return;
 
-            mMqttClient.publish(TOPIC_OBSTACLE_DISTANCE, obstacleDistances.toString());
-            mMqttClient.publish(TOPIC_OBSTACLE_WARNING, obstacleWarnings.toString());
+            mMqttClient.publish(TOPIC_OBSTACLE_DISTANCE, obstacleDistances.toString(), false);
+            mMqttClient.publish(TOPIC_OBSTACLE_WARNING, obstacleWarnings.toString(), false);
         });
     }
 
     private void publishStatusConnection(boolean state) {
         if (!isMqttConnected()) return;
 
-        mMqttClient.publish(TOPIC_STATUS_CONNECTION, String.valueOf(state));
+        mMqttClient.publish(TOPIC_STATUS_CONNECTION, String.valueOf(state), true);
     }
 
     private void publishStatusFlightControl(boolean state) {
         if (!isMqttConnected()) return;
 
-        mMqttClient.publish(TOPIC_STATUS_FLIGHT_CONTROL, String.valueOf(state));
+        mMqttClient.publish(TOPIC_STATUS_FLIGHT_CONTROL, String.valueOf(state), true);
     }
 
     private void publishModelName() {
         if (!isMqttConnected() || !isAircraftConnected()) return;
 
-        mMqttClient.publish(TOPIC_MODEL_NAME, mAircraft.getModel().getDisplayName());
+        mMqttClient.publish(TOPIC_MODEL_NAME, mAircraft.getModel().getDisplayName(), true);
     }
 
     void startLivestream(Context context) {
@@ -745,7 +745,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 int result = DJISDKManager.getInstance().getLiveStreamManager().startStream();
                 DJISDKManager.getInstance().getLiveStreamManager().setStartTime();
                 context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).edit().putString(URL_KEY, mRtmpServerURI).commit();
-                showToast(DJISDKManager.getInstance().getLiveStreamManager().getLiveUrl() + ": " + result + "\n" +
+                showToast("Livestream result: " + result + "\n" +
                         "isVideoStreamSpeedConfigurable: " + DJISDKManager.getInstance().getLiveStreamManager().isVideoStreamSpeedConfigurable() + "\n" +
                         "isLiveAudioEnabled: " + DJISDKManager.getInstance().getLiveStreamManager().isLiveAudioEnabled());
             }
@@ -803,16 +803,16 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             Log.d(TAG, "startFlightControl: Takeoff command received: " + payload);
 
             if (payload.equals("true")) {
-                mMqttClient.publish(TOPIC_CONTROL_TAKEOFF_RESULT, "started", MqttQos.EXACTLY_ONCE);
+                mMqttClient.publish(TOPIC_CONTROL_TAKEOFF_RESULT, "started", MqttQos.EXACTLY_ONCE, false);
 
                 mAircraft.getFlightController().startTakeoff(djiError -> {
                     if (djiError != null) {
-                        mMqttClient.publish(TOPIC_CONTROL_TAKEOFF_RESULT, "failed", MqttQos.EXACTLY_ONCE);
+                        mMqttClient.publish(TOPIC_CONTROL_TAKEOFF_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
 
                         Log.e(TAG, "startFlightControl: Failed to start takeoff: " + djiError.getDescription());
                         showToast("Failed to start takeoff: " + djiError.getDescription());
                     } else {
-                        mMqttClient.publish(TOPIC_CONTROL_TAKEOFF_RESULT, "completed", MqttQos.EXACTLY_ONCE);
+                        mMqttClient.publish(TOPIC_CONTROL_TAKEOFF_RESULT, "completed", MqttQos.EXACTLY_ONCE, false);
 
                         Log.d(TAG, "startFlightControl: Takeoff complete");
                     }
@@ -826,16 +826,16 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             Log.d(TAG, "startFlightControl: RTH command received: " + payload);
 
             if (payload.equals("true")) {
-                mMqttClient.publish(TOPIC_CONTROL_RTH_RESULT, "started", MqttQos.EXACTLY_ONCE);
+                mMqttClient.publish(TOPIC_CONTROL_RTH_RESULT, "started", MqttQos.EXACTLY_ONCE, false);
 
                 mAircraft.getFlightController().startGoHome(djiError -> {
                     if (djiError != null) {
-                        mMqttClient.publish(TOPIC_CONTROL_RTH_RESULT, "failed", MqttQos.EXACTLY_ONCE);
+                        mMqttClient.publish(TOPIC_CONTROL_RTH_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
 
                         Log.e(TAG, "startFlightControl: Failed to start go home: " + djiError.getDescription());
                         showToast("Failed to start go home: " + djiError.getDescription());
                     } else {
-                        mMqttClient.publish(TOPIC_CONTROL_RTH_RESULT, "completed", MqttQos.EXACTLY_ONCE);
+                        mMqttClient.publish(TOPIC_CONTROL_RTH_RESULT, "completed", MqttQos.EXACTLY_ONCE, false);
 
                         Log.d(TAG, "startFlightControl: Starting to go home");
                     }
@@ -849,11 +849,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             Log.d(TAG, "startFlightControl: Land command received: " + payload);
 
             if (payload.equals("true")) {
-                mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "started", MqttQos.EXACTLY_ONCE);
+                mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "started", MqttQos.EXACTLY_ONCE, false);
 
                 mAircraft.getFlightController().startLanding(djiError -> {
                     if (djiError != null) {
-                        mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "failed", MqttQos.EXACTLY_ONCE);
+                        mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
 
                         Log.e(TAG, "startFlightControl: Failed to start landing: " + djiError.getDescription());
                         showToast("Failed to start landing: " + djiError.getDescription());

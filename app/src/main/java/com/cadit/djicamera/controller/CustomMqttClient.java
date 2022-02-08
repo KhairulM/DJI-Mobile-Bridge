@@ -60,16 +60,17 @@ public class CustomMqttClient {
         }
     }
 
-    public synchronized void publish (String topic, String payload) {
-        publish(topic, payload, MqttQos.AT_LEAST_ONCE);
+    public synchronized void publish (String topic, String payload, Boolean retain) {
+        publish(topic, payload, MqttQos.AT_LEAST_ONCE, retain);
     }
 
     @SuppressLint("NewApi")
-    public synchronized void publish (String topic, String payload, MqttQos qos) {
+    public synchronized void publish (String topic, String payload, MqttQos qos, Boolean retain) {
         mClient.publishWith()
                 .topic(topic)
                 .payload(payload.getBytes())
                 .qos(qos)
+                .retain(retain)
                 .send()
                 .whenComplete((pubMsg, throwable) -> {
                     if (throwable != null) {
