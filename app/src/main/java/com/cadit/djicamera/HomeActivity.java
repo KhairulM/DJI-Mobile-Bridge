@@ -787,14 +787,25 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                     Float.parseFloat(strControls[3])
             );
 
-            mAircraft.getFlightController().sendVirtualStickFlightControlData(newControl, djiError -> {
-                if (djiError != null) {
-                    showToast("Failed to send virtual stick control data: " + djiError.getDescription());
-                    Log.e(TAG, "startFlightControl: Failed to send virtual stick control data: " + djiError.getDescription());
-                } else {
-                    Log.d(TAG, "startFlightControl: Control sent: " + payload);
+            int freq = 6;
+
+            for (int i = 0; i < freq; i++) {
+                try {
+                    mAircraft.getFlightController().sendVirtualStickFlightControlData(newControl, djiError -> {
+                        if (djiError != null) {
+                            showToast("Failed to send virtual stick control data: " + djiError.getDescription());
+                            Log.e(TAG, "startFlightControl: Failed to send virtual stick control data: " + djiError.getDescription());
+                        } else {
+                            Log.d(TAG, "startFlightControl: Control sent: " + payload);
+                        }
+                    });
+
+                    Thread.sleep(1000/freq);
+                } catch (InterruptedException e) {
+                    showToast("startFlightControl: interruption exception: " + e.toString());
+                    Log.e(TAG, "startFlightControl: interruption exception: " + e.toString());
                 }
-            });
+            }
         });
 
         mMqttClient.subscribe(TOPIC_CONTROL_TAKEOFF, (message) -> {
