@@ -94,7 +94,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private String mMqttBrokerURI = "";
     private String mMqttUsername = "";
     private String mMqttPassword = "";
-    private int mMqttPort = 1883;
+    private int mMqttPort = DEFAULT_MQTT_PORT;
 
 
     private Boolean mIsRtmpURIValid = false;
@@ -300,13 +300,13 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     private void initListener() {
         Pattern rtmpRegexp = Pattern.compile("^(rtmp:\\/\\/)((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)(\\.(?!$)|:[0-9]+\\/)){4}(live(\\/|$))[a-zA-Z0-9]*?$");
-        Pattern mqttRegexp = Pattern.compile("^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)(\\.(?!$)|:[0-9]+$|$)){4}$");
+        Pattern mqttRegexp = Pattern.compile("^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)(\\.(?!$)|$)){4}$");
 
         mEditIpAddress.addTextChangedListener(new CustomTextWatcher(mEditIpAddress) {
             @Override
             public void validate(TextView textView, String text) {
                 mRtmpServerURI = String.format("rtmp://%s:%d/live/1234", text, DEFAULT_RTMP_PORT);
-                mMqttBrokerURI= String.format("%s:%d", text, DEFAULT_MQTT_PORT);
+                mMqttBrokerURI= text;
 
                 mIsRtmpURIValid = rtmpRegexp.matcher(mRtmpServerURI).matches();
                 mIsMqttURIValid = mqttRegexp.matcher(mMqttBrokerURI).matches();
@@ -427,7 +427,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
             setConnectButtonEnabled();
             mTextConnectionStatus.setText("Status: DJIAircraft connected");
-            mTextConnectionStatus.setVisibility(View.VISIBLE);
 
             if (mAircraft.getFirmwarePackageVersion() != null) {
                 mTextFirmwareVersion.setText("Firmware version: " + mAircraft.getFirmwarePackageVersion());
@@ -457,7 +456,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             Log.d(TAG, "refreshSDK: False");
             mTextConnectionStatus.setText(R.string.product_status_default);
-            mTextConnectionStatus.setVisibility(View.GONE);
 
             mTextProduct.setText(R.string.product_name_default);
             mTextFirmwareVersion.setText(R.string.firmware_default_text);
