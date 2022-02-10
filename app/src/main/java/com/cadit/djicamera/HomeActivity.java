@@ -38,6 +38,7 @@ import dji.common.error.DJISDKError;
 import dji.common.flightcontroller.FlightMode;
 import dji.common.flightcontroller.FlightOrientationMode;
 import dji.common.flightcontroller.ObstacleDetectionSector;
+import dji.common.flightcontroller.flyzone.FlyZoneState;
 import dji.common.flightcontroller.virtualstick.FlightControlData;
 import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
 import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
@@ -49,6 +50,7 @@ import dji.sdk.base.BaseProduct;
 import dji.sdk.camera.VideoFeeder;
 import dji.sdk.flightcontroller.FlightAssistant;
 import dji.sdk.flightcontroller.FlightController;
+import dji.sdk.flightcontroller.FlyZoneManager;
 import dji.sdk.products.Aircraft;
 import dji.sdk.products.HandHeld;
 import dji.sdk.sdkmanager.DJISDKInitEvent;
@@ -89,6 +91,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private Aircraft mAircraft = null;
     private LiveStreamManager.OnLiveChangeListener mListener;
     private AtomicBoolean mIsVirtualStickControlModeEnabled = new AtomicBoolean(false);
+    private FlyZoneState mFlyZoneState;
 
     private String mRtmpServerURI = "";
     private String mMqttBrokerURI = "";
@@ -510,6 +513,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                     registerLivestreamListener();
                     registerLiveVideoFeed();
                     setFlightControllerCallback();
+                    setFlyZoneCallback();
                     setObstacleCallback();
                     setBatteryCallback();
                     publishModelName();
@@ -531,7 +535,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                     Log.d(TAG, "onClickStartLivestream");
 
                     startLivestream(this);
-                    mBtnToggleLivestream.setText(R.string.button_stop_livestream);
                 } else {
                     Log.d(TAG, "onClickStopLivestream");
 
@@ -546,7 +549,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                     Log.d(TAG, "onClickStartFlightControl");
 
                     startFlightControl();
-                    mBtnToggleControl.setText(R.string.button_stop_control);
                 } else {
                     Log.d(TAG, "onClickStopFlightControl");
 
@@ -666,6 +668,15 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         });
     }
 
+    private void setFlyZoneCallback() {
+        if (!isAircraftConnected()) return;
+
+        FlyZoneManager fzManager = DJISDKManager.getInstance().getFlyZoneManager();
+        fzManager.setFlyZoneStateCallback(flyZoneState -> {
+            mFlyZoneState = flyZoneState;
+        });
+    }
+
     private void setBatteryCallback () {
         if (!isAircraftConnected()) return;
 
@@ -745,6 +756,16 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 int result = DJISDKManager.getInstance().getLiveStreamManager().startStream();
                 DJISDKManager.getInstance().getLiveStreamManager().setStartTime();
                 context.getSharedPreferences(context.getPackageName(), Context.MODE_PRIVATE).edit().putString(URL_KEY, mRtmpServerURI).commit();
+
+                if (result == 0) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            mBtnToggleLivestream.setText(R.string.button_stop_livestream);
+                        }
+                    });
+                }
+
                 showToast("Livestream result: " + result + "\n" +
                         "isVideoStreamSpeedConfigurable: " + DJISDKManager.getInstance().getLiveStreamManager().isVideoStreamSpeedConfigurable() + "\n" +
                         "isLiveAudioEnabled: " + DJISDKManager.getInstance().getLiveStreamManager().isLiveAudioEnabled());
@@ -762,6 +783,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void startFlightControl() {
+        if (mFlyZoneState != FlyZoneState.CLEAR) {
+            showToast("Unable to start flight control: Fly zone: " + mFlyZoneState.toString());
+            return;
+        }
+
         showToast("Starting flight control");
 
         setVirtualStickControlModeEnabled(true);
@@ -863,6 +889,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 });
             }
         });
+
+        mBtnToggleControl.setText(R.string.button_stop_control);
     }
 
     private void stopFlightControl() {
