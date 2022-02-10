@@ -76,7 +76,7 @@ public class CustomMqttClient {
                     if (throwable != null) {
                         Log.e(mTag, "Failed to publish message: " + throwable.toString());
                     } else {
-                        Log.v(mTag, pubMsg.toString());
+                        Log.d(mTag, "Publish MQTT " + topic + ": " + pubMsg.toString());
                     }
                 });;
     }
@@ -91,7 +91,7 @@ public class CustomMqttClient {
                     if (throwable != null) {
                         Log.e(mTag, "Failed to subscribe " + topic + " : " + throwable.toString());
                     } else {
-                        Log.v(mTag, subAck.toString());
+                        Log.v(mTag, "Subscribe MQTT " + topic + ": " + subAck.toString());
                     }
                 });
     }

@@ -380,7 +380,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     private boolean isLanding(){
         return isFlightControllerAvailable() &&
-                mAircraft.getFlightController().getState().getFlightMode() == FlightMode.AUTO_LANDING;
+                (mAircraft.getFlightController().getState().getFlightMode() == FlightMode.AUTO_LANDING ||
+                mAircraft.getFlightController().getState().getFlightMode() == FlightMode.CONFIRM_LANDING);
     }
 
     private void onConnectionChange() {
@@ -639,8 +640,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
         FlightController fc = mAircraft.getFlightController();
         fc.setStateCallback(flightControllerState -> {
-            if (!isMqttConnected()) return;
-
             // check if landing confirmation needed
             if (isLanding() && flightControllerState.isLandingConfirmationNeeded()) {
                 mAircraft.getFlightController().confirmLanding((djiError) -> {
@@ -650,6 +649,11 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                     } else {
                         Log.d(TAG, "setFlightControllerCallback: Landing completed");
                         mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "completed", MqttQos.EXACTLY_ONCE, false);
+
+                        while (flightControllerState.isFlying()) {
+                            continue;
+                        }
+
                         setMotorsState(false);
                     }
                 });
@@ -783,7 +787,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void startFlightControl() {
-        if (mFlyZoneState != FlyZoneState.CLEAR) {
+        if (mFlyZoneState == FlyZoneState.IN_RESTRICTED_ZONE) {
             showToast("Unable to start flight control: Fly zone: " + mFlyZoneState.toString());
             return;
         }
