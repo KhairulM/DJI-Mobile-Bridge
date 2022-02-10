@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">DJI Camera</string>
+    <string name="app_name">DJI Mobile Bridge</string>
     <string name="action_settings">Settings</string>
     <string name="disconnected">Disconnected</string>
     <string name="product_information">Product Information</string>

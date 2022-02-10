@@ -593,12 +593,12 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         if (!isFlightControllerAvailable()) return;
         if (mIsVirtualStickControlModeEnabled.get() == enabled) return;
 
-        mAircraft.getFlightController().setFlightOrientationMode(FlightOrientationMode.AIRCRAFT_HEADING, djiError -> {
-            if (djiError != null) {
-                Log.e(TAG, "setFlightOrientationMode: " + djiError.getDescription());
-                showToast("Failed to set flight orientation mode: " + djiError.getDescription());
-            }
-        });
+//        mAircraft.getFlightController().setFlightOrientationMode(FlightOrientationMode.AIRCRAFT_HEADING, djiError -> {
+//            if (djiError != null) {
+//                Log.e(TAG, "setFlightOrientationMode: " + djiError.getDescription());
+//                showToast("Failed to set flight orientation mode: " + djiError.getDescription());
+//            }
+//        });
 
         // enabling virtual stick control mode
         mAircraft.getFlightController().setVirtualStickModeEnabled(enabled, djiError -> {
@@ -787,25 +787,14 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                     Float.parseFloat(strControls[3])
             );
 
-            int freq = 6;
-
-            for (int i = 0; i < freq; i++) {
-                try {
-                    mAircraft.getFlightController().sendVirtualStickFlightControlData(newControl, djiError -> {
-                        if (djiError != null) {
-                            showToast("Failed to send virtual stick control data: " + djiError.getDescription());
-                            Log.e(TAG, "startFlightControl: Failed to send virtual stick control data: " + djiError.getDescription());
-                        } else {
-                            Log.d(TAG, "startFlightControl: Control sent: " + payload);
-                        }
-                    });
-
-                    Thread.sleep(1000/freq);
-                } catch (InterruptedException e) {
-                    showToast("startFlightControl: interruption exception: " + e.toString());
-                    Log.e(TAG, "startFlightControl: interruption exception: " + e.toString());
+            mAircraft.getFlightController().sendVirtualStickFlightControlData(newControl, djiError -> {
+                if (djiError != null) {
+                    showToast("Failed to send virtual stick control data: " + djiError.getDescription());
+                    Log.e(TAG, "startFlightControl: Failed to send virtual stick control data: " + djiError.getDescription());
+                } else {
+                    Log.d(TAG, "startFlightControl: Control sent: " + payload);
                 }
-            }
+            });
         });
 
         mMqttClient.subscribe(TOPIC_CONTROL_TAKEOFF, (message) -> {
