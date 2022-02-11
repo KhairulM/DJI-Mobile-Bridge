@@ -717,11 +717,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         Log.d(TAG, "setFlightControllerCallback: Landing completed");
                         mMqttClient.publish(TOPIC_CONTROL_LAND_RESULT, "completed", MqttQos.EXACTLY_ONCE, false);
 
-                        while (flightControllerState.isFlying()) {
-                            continue;
-                        }
-
-                        setMotorsState(false);
+//                        setMotorsState(false);
                     }
                 });
             }
