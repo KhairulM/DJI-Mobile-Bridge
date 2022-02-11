@@ -44,6 +44,9 @@ import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
 import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
 import dji.common.flightcontroller.virtualstick.VerticalControlMode;
 import dji.common.flightcontroller.virtualstick.YawControlMode;
+import dji.common.gimbal.GimbalMode;
+import dji.common.gimbal.Rotation;
+import dji.common.gimbal.RotationMode;
 import dji.log.DJILog;
 import dji.sdk.base.BaseComponent;
 import dji.sdk.base.BaseProduct;
@@ -69,6 +72,9 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     // MQTT TOPICS
     private static final String TOPIC_OBSTACLE_DISTANCE = "dji/obstacle/distance";
     private static final String TOPIC_OBSTACLE_WARNING = "dji/obstacle/warning";
+    private static final String TOPIC_GIMBAL = "dji/gimbal";
+    private static final String TOPIC_GIMBAL_RESET = "dji/gimbal/reset";
+    private static final String TOPIC_GIMBAL_RESET_RESULT = "dji/gimbal/reset/result";
     private static final String TOPIC_CONTROL = "dji/control";
     private static final String TOPIC_CONTROL_TAKEOFF = "dji/control/takeoff";
     private static final String TOPIC_CONTROL_RTH = "dji/control/rth";
@@ -361,6 +367,10 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
     private boolean isMqttConnected() {return mMqttClient != null && mMqttClient.isMqttConnected();}
 
+    private boolean isGimbalAvailable() {
+        return isAircraftConnected() && mAircraft.getGimbal() != null;
+    }
+
     private boolean isFlightControllerAvailable() {
         return isAircraftConnected() && mAircraft.getFlightController() != null;
     }
@@ -513,6 +523,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
                     registerLivestreamListener();
                     registerLiveVideoFeed();
+                    setGimbalControl();
                     setFlightControllerCallback();
                     setFlyZoneCallback();
                     setObstacleCallback();
@@ -520,14 +531,14 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                     publishModelName();
                     publishStatusConnection(true);
 
-                    refreshSDKRelativeUI();
                 } else {
                     Log.d(TAG, "onClickDisconnect");
 
                     gracefullyDisconnect();
 
-                    refreshSDKRelativeUI();
                 }
+
+                refreshSDKRelativeUI();
                 break;
             }
 
@@ -633,6 +644,62 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 }
             });
         }
+    }
+
+    private void setGimbalControl() {
+        if (!isGimbalAvailable()) return;
+
+        mAircraft.getGimbal().setMode(GimbalMode.YAW_FOLLOW, djiError -> {
+            if (djiError != null) {
+                showToast("Failed to set gimbal mode: " + djiError.getDescription());
+                Log.e(TAG, "setGimbalControl: Failed to set gimbal mode: " + djiError.getDescription());
+            } else {
+                Log.d(TAG, "setGimbalControl: Gimbal mode set");
+            }
+        });
+
+        mMqttClient.subscribe(TOPIC_GIMBAL, (message) -> {
+            final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
+
+            String[] strControls = payload.substring(1, payload.length()-1).split(",");
+
+            Rotation rot = new Rotation.Builder()
+                    .mode(RotationMode.RELATIVE_ANGLE)
+                    .pitch(Float.parseFloat(strControls[0]))
+                    .roll(Float.parseFloat(strControls[1]))
+                    .yaw(Rotation.NO_ROTATION)
+                    .build();
+
+            mAircraft.getGimbal().rotate(rot, djiError -> {
+                if (djiError != null) {
+                    showToast("Failed to control gimbal: " + djiError.getDescription());
+                    Log.e(TAG, "setGimbalControl: Failed to control gimbal: " + djiError.getDescription());
+                } else {
+                    Log.d(TAG, "setGimbalControl: Gimbal control sent: " + payload);
+                }
+            });
+        });
+
+        mMqttClient.subscribe(TOPIC_GIMBAL_RESET, (message) -> {
+            final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
+
+            if (payload.equals("true")) {
+                mAircraft.getGimbal().reset(djiError -> {
+                    if (djiError != null) {
+                        showToast("Failed to reset gimbal: " + djiError.getDescription());
+                        Log.e(TAG, "setGimbalControl: Failed to reset gimbal: " + djiError.getDescription());
+
+                        mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
+                    } else {
+                        Log.d(TAG, "setGimbalControl: Gimbal reset");
+
+                        mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "reset", MqttQos.EXACTLY_ONCE, false);
+                    }
+                });
+            } else {
+                mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
+            }
+        });
     }
 
     private void setFlightControllerCallback() {
