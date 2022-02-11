@@ -44,9 +44,11 @@ import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
 import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
 import dji.common.flightcontroller.virtualstick.VerticalControlMode;
 import dji.common.flightcontroller.virtualstick.YawControlMode;
+import dji.common.gimbal.CapabilityKey;
 import dji.common.gimbal.GimbalMode;
 import dji.common.gimbal.Rotation;
 import dji.common.gimbal.RotationMode;
+import dji.common.util.DJIParamCapability;
 import dji.log.DJILog;
 import dji.sdk.base.BaseComponent;
 import dji.sdk.base.BaseProduct;
@@ -54,6 +56,7 @@ import dji.sdk.camera.VideoFeeder;
 import dji.sdk.flightcontroller.FlightAssistant;
 import dji.sdk.flightcontroller.FlightController;
 import dji.sdk.flightcontroller.FlyZoneManager;
+import dji.sdk.gimbal.Gimbal;
 import dji.sdk.products.Aircraft;
 import dji.sdk.products.HandHeld;
 import dji.sdk.sdkmanager.DJISDKInitEvent;
@@ -380,7 +383,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private boolean isFlightControlling() {
-        return mBtnToggleControl.getText().toString() == getString(R.string.button_start_control);
+        return mBtnToggleControl.getText().toString() == getString(R.string.button_stop_control);
     }
 
     private boolean isVirtualStickControlModeAvailable() {
@@ -393,6 +396,24 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 (mAircraft.getFlightController().getState().getFlightMode() == FlightMode.AUTO_LANDING ||
                 mAircraft.getFlightController().getState().getFlightMode() == FlightMode.CONFIRM_LANDING);
     }
+
+//    private boolean isGimbalFeatureSupported(CapabilityKey key) {
+//
+//        Gimbal gimbal = mAircraft.getGimbal();
+//        if (gimbal == null) {
+//            return false;
+//        }
+//
+//        DJIParamCapability capability = null;
+//        if (gimbal.getCapabilities() != null) {
+//            capability = gimbal.getCapabilities().get(key);
+//        }
+//
+//        if (capability != null) {
+//            return capability.isSupported();
+//        }
+//        return false;
+//    }
 
     private void onConnectionChange() {
         if (isAircraftConnected()) return;
@@ -571,12 +592,12 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             }
 
             case R.id.button_check_status: {
-                showToast("Is LiveStreamManager on: " + String.valueOf(isLiveStreamManagerOn()) + "\n" +
-                "Is livestreaming: " + String.valueOf(isLivestreaming()) + "\n" +
-                "Is MQTT broker connected: " + String.valueOf(isMqttConnected()) + "\n" +
-                "Is flight controller available: " + String.valueOf(isFlightControllerAvailable()) + "\n" +
-                "Is virtual stick control enabled: " + String.valueOf(mIsVirtualStickControlModeEnabled.get()) + "\n" +
-                "Is virtual stick control available: " + String.valueOf(isVirtualStickControlModeAvailable()));
+                showToast("LiveStreamManager on: " + String.valueOf(isLiveStreamManagerOn()) + "\n" +
+                "MQTT broker connected: " + String.valueOf(isMqttConnected()) + "\n" +
+                "Livestreaming: " + String.valueOf(isLivestreaming()) + "\n" +
+                "Flight controller available: " + String.valueOf(isFlightControllerAvailable()) + "\n" +
+                "Virtual stick enabled: " + String.valueOf(mIsVirtualStickControlModeEnabled.get()) + "\n" +
+                "Virtual stick available: " + String.valueOf(isVirtualStickControlModeAvailable()));
                 break;
             }
 
@@ -626,26 +647,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         });
     }
 
-    private void setMotorsState(boolean state) {
-        if (!isFlightControllerAvailable()) return;
-
-        if (state) {
-            mAircraft.getFlightController().turnOnMotors(djiError -> {
-                if (djiError != null) {
-                    Log.e(TAG, "setMotorsState: " + djiError.getDescription());
-                    showToast("Failed to turn on motors: " + djiError.getDescription());
-                }
-            });
-        } else {
-            mAircraft.getFlightController().turnOffMotors(djiError -> {
-                if (djiError != null) {
-                    Log.e(TAG, "setMotorsState: " + djiError.getDescription());
-                    showToast("Failed to turn off motors: " + djiError.getDescription());
-                }
-            });
-        }
-    }
-
     private void setGimbalControl() {
         if (!isGimbalAvailable()) return;
 
@@ -661,16 +662,14 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         mMqttClient.subscribe(TOPIC_GIMBAL, (message) -> {
             final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
 
-            String[] strControls = payload.substring(1, payload.length()-1).split(",");
-
-            Rotation rot = new Rotation.Builder()
+            Rotation.Builder builder = new Rotation.Builder()
                     .mode(RotationMode.RELATIVE_ANGLE)
-                    .pitch(Float.parseFloat(strControls[0]))
-                    .roll(Float.parseFloat(strControls[1]))
-                    .yaw(Rotation.NO_ROTATION)
-                    .build();
+                    .time(0);
 
-            mAircraft.getGimbal().rotate(rot, djiError -> {
+            builder.pitch(Float.parseFloat(payload));
+
+            final Rotation rotation = builder.build();
+            mAircraft.getGimbal().rotate(rotation, djiError -> {
                 if (djiError != null) {
                     showToast("Failed to control gimbal: " + djiError.getDescription());
                     Log.e(TAG, "setGimbalControl: Failed to control gimbal: " + djiError.getDescription());
@@ -692,7 +691,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                         mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
                     } else {
                         Log.d(TAG, "setGimbalControl: Gimbal reset");
-
                         mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "reset", MqttQos.EXACTLY_ONCE, false);
                     }
                 });
@@ -993,8 +991,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
         Log.e(TAG, "onDestroy");
         unregisterReceiver(mReceiver);
         gracefullyDisconnect();
-
-        if (isMqttConnected()) mMqttClient.disconnect();
 
         super.onDestroy();
     }
