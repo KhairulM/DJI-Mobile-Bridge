@@ -25,6 +25,12 @@ import com.cadit.djicamera.controller.CustomMqttClient;
 import com.cadit.djicamera.controller.CustomTextWatcher;
 import com.cadit.djicamera.utilities.VideoFeedView;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
+import com.hivemq.client.mqtt.lifecycle.MqttClientConnectedContext;
+import com.hivemq.client.mqtt.lifecycle.MqttClientConnectedListener;
+import com.hivemq.client.mqtt.lifecycle.MqttClientDisconnectedContext;
+import com.hivemq.client.mqtt.lifecycle.MqttClientDisconnectedListener;
+
+import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -36,7 +42,6 @@ import java.util.regex.Pattern;
 import dji.common.error.DJIError;
 import dji.common.error.DJISDKError;
 import dji.common.flightcontroller.FlightMode;
-import dji.common.flightcontroller.FlightOrientationMode;
 import dji.common.flightcontroller.ObstacleDetectionSector;
 import dji.common.flightcontroller.flyzone.FlyZoneState;
 import dji.common.flightcontroller.virtualstick.FlightControlData;
@@ -44,11 +49,9 @@ import dji.common.flightcontroller.virtualstick.FlightCoordinateSystem;
 import dji.common.flightcontroller.virtualstick.RollPitchControlMode;
 import dji.common.flightcontroller.virtualstick.VerticalControlMode;
 import dji.common.flightcontroller.virtualstick.YawControlMode;
-import dji.common.gimbal.CapabilityKey;
 import dji.common.gimbal.GimbalMode;
 import dji.common.gimbal.Rotation;
 import dji.common.gimbal.RotationMode;
-import dji.common.util.DJIParamCapability;
 import dji.log.DJILog;
 import dji.sdk.base.BaseComponent;
 import dji.sdk.base.BaseProduct;
@@ -56,7 +59,6 @@ import dji.sdk.camera.VideoFeeder;
 import dji.sdk.flightcontroller.FlightAssistant;
 import dji.sdk.flightcontroller.FlightController;
 import dji.sdk.flightcontroller.FlyZoneManager;
-import dji.sdk.gimbal.Gimbal;
 import dji.sdk.products.Aircraft;
 import dji.sdk.products.HandHeld;
 import dji.sdk.sdkmanager.DJISDKInitEvent;
@@ -96,6 +98,30 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
     private static final String TOPIC_STATUS_HORIZONTAL_SPEED = "dji/status/horizontal-speed";
 
     private CustomMqttClient mMqttClient = null;
+    MqttClientConnectedListener mMqttConnectedListener = new MqttClientConnectedListener() {
+        @Override
+        public void onConnected(@NotNull MqttClientConnectedContext context) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    refreshSDKRelativeUI();
+                }
+            });
+        }
+    };
+
+    MqttClientDisconnectedListener mMqttDisconnectedListener = new MqttClientDisconnectedListener() {
+        @Override
+        public void onDisconnected(@NotNull MqttClientDisconnectedContext context) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    gracefullyDisconnect();
+                    refreshSDKRelativeUI();
+                }
+            });
+        }
+    };
 
     private Aircraft mAircraft = null;
     private LiveStreamManager.OnLiveChangeListener mListener;
@@ -461,7 +487,6 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             Log.d(TAG, "refreshSDK: True");
 
             setConnectButtonEnabled();
-            mTextConnectionStatus.setText("Status: DJIAircraft connected");
 
             if (mAircraft.getFirmwarePackageVersion() != null) {
                 mTextFirmwareVersion.setText("Firmware version: " + mAircraft.getFirmwarePackageVersion());
@@ -474,6 +499,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             }
 
             if (isMqttConnected()) {
+                mTextConnectionStatus.setText("Status: MQTT Connected");
+
                 mBtnToggleConnect.setText(R.string.button_disconnect);
 
                 mBtnToggleLivestream.setVisibility(View.VISIBLE);
@@ -481,6 +508,8 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
                 mBtnCheckStatus.setVisibility(View.VISIBLE);
                 mPrimaryVideoFeedView.setVisibility(View.VISIBLE);
             } else {
+                mTextConnectionStatus.setText("Status: MQTT Disconnected");
+
                 mBtnToggleConnect.setText(R.string.button_connect);
 
                 mBtnToggleLivestream.setVisibility(View.GONE);
@@ -521,7 +550,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             stopFlightControl();
         }
 
-        if (!mMqttClient.disconnect()) {
+        if (isMqttConnected() && !mMqttClient.disconnect()) {
             showToast("Failed to disconnect from MQTT broker");
         }
     }
@@ -535,7 +564,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
 
                     if (mMqttClient != null) mMqttClient.disconnect();
 
-                    mMqttClient = new CustomMqttClient(TAG, mMqttBrokerURI, mMqttPort);
+                    mMqttClient = new CustomMqttClient(TAG, mMqttBrokerURI, mMqttPort, mMqttConnectedListener, mMqttDisconnectedListener);
 
                     if (!mMqttClient.connect(mMqttUsername, mMqttPassword)) {
                         showToast("Failed to connect to MQTT broker");

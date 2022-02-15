@@ -5,6 +5,8 @@ import android.util.Log;
 
 import com.hivemq.client.mqtt.MqttClient;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
+import com.hivemq.client.mqtt.lifecycle.MqttClientConnectedListener;
+import com.hivemq.client.mqtt.lifecycle.MqttClientDisconnectedListener;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3BlockingClient;
 import com.hivemq.client.mqtt.mqtt3.message.publish.Mqtt3Publish;
@@ -17,12 +19,14 @@ public class CustomMqttClient {
 
     private CustomMqttClient () {}
 
-    public CustomMqttClient(String tag, String brokerUri, Integer port) {
+    public CustomMqttClient(String tag, String brokerUri, Integer port, MqttClientConnectedListener connectedListener, MqttClientDisconnectedListener disconnectedListener) {
         mTag = tag;
         mClient = MqttClient.builder()
                 .useMqttVersion3()
                 .serverHost(brokerUri)
                 .serverPort(port)
+                .addConnectedListener(connectedListener)
+                .addDisconnectedListener(disconnectedListener)
                 .buildAsync();
     }
 
