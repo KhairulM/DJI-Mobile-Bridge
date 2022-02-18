@@ -692,7 +692,7 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
 
             Rotation.Builder builder = new Rotation.Builder()
-                    .mode(RotationMode.RELATIVE_ANGLE)
+                    .mode(RotationMode.ABSOLUTE_ANGLE)
                     .time(0);
 
             builder.pitch(Float.parseFloat(payload));
