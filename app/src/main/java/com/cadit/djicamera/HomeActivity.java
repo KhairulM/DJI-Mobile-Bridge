@@ -708,25 +708,25 @@ public class HomeActivity extends AppCompatActivity implements View.OnClickListe
             });
         });
 
-        mMqttClient.subscribe(TOPIC_GIMBAL_RESET, (message) -> {
-            final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
-
-            if (payload.equals("true")) {
-                mAircraft.getGimbal().reset(djiError -> {
-                    if (djiError != null) {
-                        showToast("Failed to reset gimbal: " + djiError.getDescription());
-                        Log.e(TAG, "setGimbalControl: Failed to reset gimbal: " + djiError.getDescription());
-
-                        mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
-                    } else {
-                        Log.d(TAG, "setGimbalControl: Gimbal reset");
-                        mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "reset", MqttQos.EXACTLY_ONCE, false);
-                    }
-                });
-            } else {
-                mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
-            }
-        });
+//        mMqttClient.subscribe(TOPIC_GIMBAL_RESET, (message) -> {
+//            final String payload = new String(message.getPayloadAsBytes(), StandardCharsets.UTF_8);
+//
+//            if (payload.equals("true")) {
+//                mAircraft.getGimbal().reset(djiError -> {
+//                    if (djiError != null) {
+//                        showToast("Failed to reset gimbal: " + djiError.getDescription());
+//                        Log.e(TAG, "setGimbalControl: Failed to reset gimbal: " + djiError.getDescription());
+//
+//                        mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
+//                    } else {
+//                        Log.d(TAG, "setGimbalControl: Gimbal reset");
+//                        mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "reset", MqttQos.EXACTLY_ONCE, false);
+//                    }
+//                });
+//            } else {
+//                mMqttClient.publish(TOPIC_GIMBAL_RESET_RESULT, "failed", MqttQos.EXACTLY_ONCE, false);
+//            }
+//        });
     }
 
     private void setFlightControllerCallback() {
